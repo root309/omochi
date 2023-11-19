@@ -4,6 +4,7 @@ use inkwell::context::Context;
 use inkwell::builder::Builder;
 use inkwell::module::Module;
 use crate::ast::{Expr, Operator};
+use inkwell::values::FunctionValue;
 
 pub struct IRGenerator<'a> {
     context: &'a Context,
@@ -22,18 +23,33 @@ impl<'a> IRGenerator<'a> {
         IRGenerator { context, module, builder }
     }
 
-    pub fn generate_ir(&self, expr: &Expr) -> inkwell::values::IntValue {
+    pub fn build_return(&self, value: inkwell::values::IntValue) {
+        self.builder.build_return(Some(&value));
+    }
+
+    pub fn generate_ir(&self, expr: &Expr, function: &FunctionValue) -> inkwell::values::IntValue {
+        let entry = self.context.append_basic_block(*function, "entry");
+        self.builder.position_at_end(entry);
+
+        self.generate_ir_inner(expr)
+    }
+
+    fn generate_ir_inner(&self, expr: &Expr) -> inkwell::values::IntValue {
         match expr {
             Expr::Integer(value) => self.context.i32_type().const_int(*value as u64, false),
             Expr::BinaryOp(left, op, right) => {
-                let left_val = self.generate_ir(left);
-                let right_val = self.generate_ir(right);
-            
+                let left_val = self.generate_ir_inner(left);
+                let right_val = self.generate_ir_inner(right);
+
                 match op {
-                    Operator::Plus => self.builder.build_int_add(left_val, right_val, "tmpadd").expect("Failed to add values"),
-                    Operator::Minus => self.builder.build_int_sub(left_val, right_val, "tmpsub").expect("Failed to subtract values"),
+                    Operator::Plus => {
+                        self.builder.build_int_add(left_val, right_val, "addtmp").expect("Failed to add values")
+                    },
+                    Operator::Minus => {
+                        self.builder.build_int_sub(left_val, right_val, "subtmp").expect("Failed to subtract values")
+                    },
                 }
-            }
+            },
         }
     }
 }

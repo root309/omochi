@@ -33,11 +33,17 @@ fn main() {
         }
     };
 
-    let interpreter = Interpreter::new();
-    let result = interpreter.interpret(&ast);
     let context = Context::create();
     let ir_generator = IRGenerator::new(&context);
+    let i32_type = context.i32_type();
+    let fn_type = i32_type.fn_type(&[], false);
+    let function = ir_generator.module.add_function("main", fn_type, None);
+
+    // ASTからLLVM IRを生成し、関数の戻り値を設定
+    let ir_value = ir_generator.generate_ir(&ast, &function);
+    ir_generator.build_return(ir_value);
+
     // IRをファイルに出力
     ir_generator.module.print_to_file("output.ll").unwrap();
-    println!("Result: {}", result);
+    //println!("Result: {}", interpreted_result);
 }
