@@ -2,6 +2,7 @@ mod lexer;
 mod parser;
 mod ast;
 mod interpreter;
+mod irgenerator;
 
 use std::fs;
 use lexer::Lexer;
@@ -32,5 +33,9 @@ fn main() {
 
     let interpreter = Interpreter::new();
     let result = interpreter.interpret(ast);
+    let ir_generator = IRGenerator::new();
+    let ir_value = ir_generator.generate_ir(&ast);
+    // IRをファイルに出力
+    ir_generator.module.print_to_file("output.ll").unwrap();
     println!("Result: {}", result);
 }
