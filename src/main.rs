@@ -8,6 +8,8 @@ use std::fs;
 use lexer::Lexer;
 use parser::Parser;
 use interpreter::Interpreter;
+use crate::irgenerator::IRGenerator;
+use inkwell::context::Context;
 
 fn main() {
     let filename = "program.txt";
@@ -32,9 +34,9 @@ fn main() {
     };
 
     let interpreter = Interpreter::new();
-    let result = interpreter.interpret(ast);
-    let ir_generator = IRGenerator::new();
-    let ir_value = ir_generator.generate_ir(&ast);
+    let result = interpreter.interpret(&ast);
+    let context = Context::create();
+    let ir_generator = IRGenerator::new(&context);
     // IRをファイルに出力
     ir_generator.module.print_to_file("output.ll").unwrap();
     println!("Result: {}", result);

@@ -5,15 +5,17 @@ use inkwell::builder::Builder;
 use inkwell::module::Module;
 use crate::ast::{Expr, Operator};
 
-pub struct IRGenerator {
-    context: Context,
-    module: Module,
-    builder: Builder,
+pub struct IRGenerator<'a> {
+    context: &'a Context,
+    pub module: Module<'a>,
+    builder: Builder<'a>,
 }
 
-impl IRGenerator {
-    pub fn new() -> Self {
-        let context = Context::create();
+impl<'a> IRGenerator<'a> {
+    pub fn get_module(&self) -> &Module<'a> {
+        &self.module
+    }
+    pub fn new(context: &'a Context) -> Self {
         let module = context.create_module("main");
         let builder = context.create_builder();
 
@@ -26,10 +28,10 @@ impl IRGenerator {
             Expr::BinaryOp(left, op, right) => {
                 let left_val = self.generate_ir(left);
                 let right_val = self.generate_ir(right);
-
+            
                 match op {
-                    Operator::Plus => self.builder.build_int_add(left_val, right_val, "tmpadd"),
-                    Operator::Minus => self.builder.build_int_sub(left_val, right_val, "tmpsub"),
+                    Operator::Plus => self.builder.build_int_add(left_val, right_val, "tmpadd").expect("Failed to add values"),
+                    Operator::Minus => self.builder.build_int_sub(left_val, right_val, "tmpsub").expect("Failed to subtract values"),
                 }
             }
         }

@@ -3,7 +3,7 @@ use crate::ast::{Expr, Operator, Token};
 #[derive(Debug)]
 pub enum ParserError {
     UnexpectedToken,
-    UnexpectedEOF,
+    //UnexpectedEOF,
 }
 pub struct Parser {
     tokens: Vec<Token>,
@@ -51,22 +51,22 @@ impl Parser {
         Ok(operator)
     }
     // TODO:thenの実装に使う
-    fn match_tokens(&mut self, types: &[Token]) -> bool {
-        for token_type in types {
-            if self.check(token_type) {
-                self.advance();
-                return true;
-            }
-        }
-        false
-    }
+    // fn match_tokens(&mut self, types: &[Token]) -> bool {
+    //     for token_type in types {
+    //         if self.check(token_type) {
+    //             self.advance();
+    //             return true;
+    //         }
+    //     }
+    //     false
+    // }
     // TODO:三項演算子やらを実装するのに使う
-    fn check(&self, token_type: &Token) -> bool {
-        if self.is_at_end() {
-            return false;
-        }
-        self.tokens.get(self.current).unwrap() == token_type
-    }
+    // fn check(&self, token_type: &Token) -> bool {
+    //     if self.is_at_end() {
+    //         return false;
+    //     }
+    //     self.tokens.get(self.current).unwrap() == token_type
+    // }
 
     fn advance(&mut self) -> &Token {
         if !self.is_at_end() {
