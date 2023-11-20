@@ -85,6 +85,9 @@ impl<'a> Lexer<'a> {
         }
         Ok(match identifier.as_str() {
             "let" => Token::Let,
+            "fn" => Token::Fn,
+            "if" => Token::If,
+            "print" => Token::Print,
             _ => Token::Identifier(identifier),
         })
     }
