@@ -1,5 +1,6 @@
 use crate::ast::{Expr, Operator, Token, Statement, Function, Type};
 
+// 構文解析器のエラーを表す列挙型
 #[derive(Debug)]
 pub enum ParserError {
     UnexpectedToken,
@@ -7,17 +8,20 @@ pub enum ParserError {
     InvalidSyntax,
 }
 
+// 構文解析器本体の構造体
 pub struct Parser {
-    tokens: Vec<Token>,
-    current: usize,
+    tokens: Vec<Token>, // 解析するトークンの列
+    current: usize,     // 現在解析中のトークンの位置
 }
 
 impl Parser {
+    // 新しい構文解析器インスタンスを作成
     pub fn new(tokens: Vec<Token>) -> Self {
         Parser { tokens, current: 0 }
     }
 
     // トークン列から次のトークンを取得し、カーソルを進める
+    // 次のトークンを消費して、カーソルを進める
     fn consume(&mut self) -> Option<Token> {
         if self.is_at_end() {
             None
@@ -28,12 +32,12 @@ impl Parser {
         }
     }
 
-    // 現在のトークンを確認
+    // 現在のトークンを取得(消費しない)
     fn peek(&self) -> Option<&Token> {
         self.tokens.get(self.current)
     }
 
-    // 指定されたトークンを期待しているか確認
+    // 指定されたトークンを期待しているか確認し、そうでなければエラー
     fn expect_token(&mut self, expected: Token) -> Result<(), ParserError> {
         let token = self.consume().ok_or(ParserError::UnexpectedEOF)?;
         if token == expected {
@@ -43,7 +47,7 @@ impl Parser {
         }
     }
 
-    // 現在のトークンがEOFかどうか
+    // 現在のトークンがEOF(入力終了)かどうか
     fn is_at_end(&self) -> bool {
         matches!(self.peek(), Some(Token::EOF) | None)
     }
@@ -60,6 +64,7 @@ impl Parser {
         Ok(expr)
     }
 
+    // 単項式(数字など基本的な要素)の解析
     fn parse_primary(&mut self) -> Result<Expr, ParserError> {
         match self.tokens.get(self.current) {
             Some(Token::Integer(value)) => {
@@ -70,6 +75,7 @@ impl Parser {
         }
     }
 
+    // 次の演算子を取得
     fn next_operator(&mut self) -> Result<Option<Operator>, ParserError> {
         let operator = match self.tokens.get(self.current) {
             Some(Token::Plus) => {
@@ -110,6 +116,7 @@ impl Parser {
         Ok(Function { name, params, return_type, body })
     }
 
+    // if文の解析
     fn parse_if_statement(&mut self) -> Result<Statement, ParserError> {
         self.expect_token(Token::If)?;
         let condition = self.parse_expression()?;
@@ -123,12 +130,14 @@ impl Parser {
         Ok(Statement::If(Box::new(condition), Box::new(Statement::Block(then_branch)), else_branch))
     }
 
+    // print文の解析
     fn parse_print_statement(&mut self) -> Result<Statement, ParserError> {
         self.expect_token(Token::Print)?;
         let expr = self.parse_expression()?;
         Ok(Statement::Print(expr))
     }
 
+    // 代入または式の文の解析
     fn parse_assignment_or_expression_statement(&mut self) -> Result<Statement, ParserError> {
         let expr = self.parse_expression()?;
         if let Expr::Assign(name, value) = expr {
@@ -172,6 +181,7 @@ impl Parser {
         Ok(params)
     }
 
+    // TODO:型推論作りたい
     // 型の解析
     fn parse_type(&mut self) -> Result<Type, ParserError> {
         match self.consume() {
@@ -184,7 +194,7 @@ impl Parser {
         }
     }
 
-    // ブロックの解析
+    // ブロック(複数の文の集合)の解析
     fn parse_block(&mut self) -> Result<Vec<Statement>, ParserError> {
         let mut statements = Vec::new();
         self.expect_token(Token::LeftBrace)?;
@@ -201,6 +211,7 @@ impl Parser {
         Ok(statements)
     }
 
+    // 文の解析
     fn parse_statement(&mut self) -> Result<Statement, ParserError> {
         let statement = match self.peek() {
             Some(Token::Let) => {
@@ -232,6 +243,7 @@ impl Parser {
         Ok(statement)
     }
 
+    // カーソルを進める補助関数
     fn advance(&mut self) -> &Token {
         if !self.is_at_end() {
             self.current += 1;
@@ -239,6 +251,7 @@ impl Parser {
         self.previous()
     }
 
+    // 直前のトークンを取得する補助関数
     fn previous(&self) -> &Token {
         &self.tokens[self.current - 1]
     }

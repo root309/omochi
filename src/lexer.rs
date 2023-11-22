@@ -1,17 +1,18 @@
 // use regex::Regex;
-use std::str::Chars;
 use crate::ast::Token;
+use std::str::Chars;
 
+// 字句解析器のエラーを表す列挙型
 #[derive(Debug)]
 pub enum LexerError {
     UnknownToken(char),
     InvalidNumber(String),
 }
 
-// 字句解析器の構造体
+// 字句解析器本体の構造体
 pub struct Lexer<'a> {
-    input: Chars<'a>,         // 入力文字列
-    current_char: Option<char>,// 現在の文字
+    input: Chars<'a>,           // 入力文字列
+    current_char: Option<char>, // 現在解析中の文字
 }
 
 impl<'a> Lexer<'a> {
@@ -71,7 +72,8 @@ impl<'a> Lexer<'a> {
             number.push(self.current_char.unwrap());
             self.next_char();
         }
-        number.parse::<i64>()
+        number
+            .parse::<i64>()
             .map(Token::Integer)
             .map_err(|_| LexerError::InvalidNumber(number))
     }

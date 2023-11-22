@@ -1,19 +1,21 @@
-use crate::ast::{Expr, Operator, Statement, Function};
+use crate::ast::{Expr, Operator, Statement, Function}; // ASTノード、演算子、ステートメント、関数定義を含むモジュールの使用
 use std::collections::HashMap;
 
+// インタープリタの構造体
 pub struct Interpreter {
-    variables: HashMap<String, i64>,
-    functions: HashMap<String, Function>,
+    variables: HashMap<String, i64>, // 変数の値を保持するHashMap
+    functions: HashMap<String, Function>, // 関数の定義を保持するHashMap
 }
 
 impl Interpreter {
+    // 新しいインタープリタのインスタンスを作成
     pub fn new() -> Self {
         Interpreter {
             variables: HashMap::new(),
             functions: HashMap::new(),
         }
     }
-
+    // ステートメントの解釈
     pub fn interpret_statement(&mut self, statement: &Statement) -> i64 {
         match statement {
             Statement::Assignment(name, expr) => {
@@ -56,7 +58,7 @@ impl Interpreter {
             },
         }
     }
-
+    // 式の解釈
     pub fn interpret_expression(&mut self, expr: &Expr) -> i64 {
         match expr {
             Expr::Integer(value) => *value,

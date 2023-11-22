@@ -7,6 +7,7 @@ use crate::ast::{Expr, Operator, Statement};
 use inkwell::values::{FunctionValue, PointerValue};
 use std::collections::HashMap;
 
+// IR生成器の構造体
 pub struct IRGenerator<'a> {
     context: &'a Context,
     pub module: Module<'a>,
@@ -15,9 +16,11 @@ pub struct IRGenerator<'a> {
 }
 
 impl<'a> IRGenerator<'a> {
+    // Moduleの取得
     pub fn get_module(&self) -> &Module<'a> {
         &self.module
     }
+    // IR生成器の新しいインスタンスを作成
     pub fn new(context: &'a Context) -> Self {
         let module = context.create_module("main");
         let builder = context.create_builder();
@@ -26,36 +29,37 @@ impl<'a> IRGenerator<'a> {
             context,
             module,
             builder, 
-            variables: HashMap::new(),
+            variables: HashMap::new(), // 変数の保持用
         }
     }
-
+    // 関数のリターン命令を生成
     pub fn build_return(&self, value: inkwell::values::IntValue) {
         self.builder.build_return(Some(&value));
     }
-
+    // IRの生成メインロジック
     pub fn generate_ir(&self, expr: &Expr, function: &FunctionValue) -> inkwell::values::IntValue {
         let entry = self.context.append_basic_block(*function, "entry");
         self.builder.position_at_end(entry);
 
         self.generate_ir_inner(expr, function)
     }
-
+    // 再帰的にASTを走査してIRを生成
     fn generate_ir_inner(&self, expr: &Expr, function: &FunctionValue) -> inkwell::values::IntValue {
         match expr {
+            // 整数リテラル
             Expr::Integer(value) => self.context.i32_type().const_int(*value as u64, false),
+            // 二項演算
             Expr::BinaryOp(left, op, right) => {
                 let left_val = self.generate_ir_inner(left, function);
                 let right_val = self.generate_ir_inner(right, function);
                 match op {
                     Operator::Plus => self.builder.build_int_add(left_val, right_val, "addtmp").expect("Failed to add values"),
                     Operator::Minus => self.builder.build_int_sub(left_val, right_val, "subtmp").expect("Failed to subtract values"),
-                    Operator::Equals => {
-                        // ここに等値比較のIR生成ロジックを実装
-                        todo!()
-                    }
+                    // ここに等値比較のIR生成ロジックを実装
+                    Operator::Equals => todo!()
                 }
             },
+            // 変数の参照
             Expr::Variable(name) => {
                 // 変数のアドレスを取得
                 let variable_address = self.variables.get(name).expect("Variable not found");
@@ -66,7 +70,7 @@ impl<'a> IRGenerator<'a> {
                     Err(_) => panic!("Failed to load variable value"),
                 }
             },
-    
+            // 変数への代入
             Expr::Assign(name, value) => {
                 // 代入する値を計算
                 let value_to_assign = self.generate_ir_inner(value, function);
@@ -76,13 +80,13 @@ impl<'a> IRGenerator<'a> {
                 self.builder.build_store(*variable_address, value_to_assign);
                 value_to_assign
             },
+            // if文のIR生成
             Expr::If(condition, then_branch, else_branch) => {
+                // 条件、thenブロック、elseブロックの生成
                 let condition_value = self.generate_ir_inner(condition, function);
-                // 新しいブロックを作成
                 let then_block = self.context.append_basic_block(*function, "then");
                 let else_block = self.context.append_basic_block(*function, "else");
                 let continue_block = self.context.append_basic_block(*function, "ifcont");
-            
                 // 条件に基づいて分岐
                 self.builder.build_conditional_branch(condition_value, then_block, else_block);
             
@@ -94,6 +98,7 @@ impl<'a> IRGenerator<'a> {
                             Statement::Expression(expr) => {
                                 self.generate_ir_inner(expr, function);
                             },
+                            // 他の文タイプに対するIR生成は未実装
                             _ => todo!("IR generation for other statement types"),
                         }
                     }
@@ -109,6 +114,7 @@ impl<'a> IRGenerator<'a> {
                                 Statement::Expression(expr) => {
                                     self.generate_ir_inner(expr, function);
                                 },
+                                // 他の文タイプに対するIR生成は未実装
                                 _ => todo!("IR generation for other statement types"),
                             }
                         }
@@ -122,6 +128,7 @@ impl<'a> IRGenerator<'a> {
                 // 一時的に0を返す
                 self.context.i32_type().const_int(0, false)
             },
+            // 関数呼び出しのIR生成
             Expr::FunctionCall(name, args) => {
                 // 関数の検索
                 let function = self.module.get_function(name).expect("Function not found");
@@ -141,7 +148,7 @@ impl<'a> IRGenerator<'a> {
             },
         }
     }
-
+    // 変数宣言のIR生成
     fn generate_declaration_ir(&self, name: &str, expr: &Expr, function: &FunctionValue) -> Result<(), String> {
         let ir_value = self.generate_ir_inner(expr, function);
         let alloca = self.create_entry_block_alloca(function, name)?;
@@ -149,7 +156,7 @@ impl<'a> IRGenerator<'a> {
         self.builder.build_store(alloca, ir_value);
         Ok(())
     }
-
+    // ブロックの先頭に変数を割り当てるための関数
     fn create_entry_block_alloca(&self, function: &FunctionValue, name: &str) -> Result<PointerValue, String> {
         let builder = self.context.create_builder();
 
