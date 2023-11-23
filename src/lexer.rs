@@ -63,6 +63,16 @@ impl<'a> Lexer<'a> {
                     tokens.push(Token::RightParen);
                     self.next_char();
                 }
+                // 左中括弧
+                '{' => {
+                    tokens.push(Token::LeftBrace);
+                    self.next_char();
+                }
+                // 右中括弧
+                '}' => {
+                    tokens.push(Token::RightBrace);
+                    self.next_char();
+                }
                 // セミコロン
                 ';' => {
                     tokens.push(Token::Semicolon); // セミコロンの解析
