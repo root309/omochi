@@ -3,7 +3,7 @@ use crate::ast::{Expr, Function, Operator, Statement, Token, Type};
 // 構文解析器のエラーを表す列挙型
 #[derive(Debug)]
 pub enum ParserError {
-    UnexpectedToken,
+    UnexpectedToken { expected: String, found: String },
     UnexpectedEOF,
     InvalidSyntax,
 }
@@ -40,11 +40,13 @@ impl Parser {
     // 指定されたトークンを期待しているか確認し、そうでなければエラー
     fn expect_token(&mut self, expected: Token) -> Result<(), ParserError> {
         let token = self.consume().ok_or(ParserError::UnexpectedEOF)?;
-        if token == expected {
-            Ok(())
-        } else {
-            Err(ParserError::UnexpectedToken)
+        if token != expected {
+            return Err(ParserError::UnexpectedToken {
+                expected: format!("{:?}", expected),
+                found: format!("{:?}", token),
+            });
         }
+        Ok(())
     }
 
     // 現在のトークンがEOF(入力終了)かどうか
@@ -71,7 +73,11 @@ impl Parser {
                 self.current += 1;
                 Ok(Expr::Integer(*value))
             }
-            _ => Err(ParserError::UnexpectedToken),
+            Some(found) => Err(ParserError::UnexpectedToken {
+                expected: format!("{:?}", Token::Integer(0)), // ここでは具体的な数字ではなく、一般的な整数トークンを期待していることを示す
+                found: format!("{:?}", found),
+            }),
+            None => Err(ParserError::UnexpectedEOF),
         }
     }
 
@@ -96,7 +102,13 @@ impl Parser {
         self.expect_token(Token::Let)?;
         let name = match self.consume() {
             Some(Token::Identifier(name)) => name,
-            _ => return Err(ParserError::UnexpectedToken),
+            Some(found) => {
+                return Err(ParserError::UnexpectedToken {
+                    expected: format!("{:?}", Token::Identifier("".to_string())),
+                    found: format!("{:?}", found),
+                })
+            }
+            None => return Err(ParserError::UnexpectedEOF),
         };
         self.expect_token(Token::Equals)?;
         let expr = self.parse_expression()?;
@@ -172,12 +184,19 @@ impl Parser {
         }
 
         loop {
-            if let Some(Token::Identifier(name)) = self.consume() {
-                self.expect_token(Token::Colon)?;
-                let param_type = self.parse_type()?;
-                params.push((name, param_type));
-            } else {
-                return Err(ParserError::UnexpectedToken);
+            match self.consume() {
+                Some(Token::Identifier(name)) => {
+                    self.expect_token(Token::Colon)?;
+                    let param_type = self.parse_type()?;
+                    params.push((name, param_type));
+                }
+                Some(found) => {
+                    return Err(ParserError::UnexpectedToken {
+                        expected: String::from("Identifier"),
+                        found: format!("{:?}", found),
+                    })
+                }
+                None => return Err(ParserError::UnexpectedEOF),
             }
 
             match self.peek() {
@@ -185,23 +204,35 @@ impl Parser {
                 Some(Token::Comma) => {
                     self.consume();
                 }
-                _ => return Err(ParserError::UnexpectedToken),
+                Some(found) => {
+                    return Err(ParserError::UnexpectedToken {
+                        expected: String::from("RightParen or Comma"),
+                        found: format!("{:?}", found),
+                    })
+                }
+                None => return Err(ParserError::UnexpectedEOF),
             }
         }
 
         Ok(params)
     }
 
-    // TODO:型推論作りたい
     // 型の解析
     fn parse_type(&mut self) -> Result<Type, ParserError> {
         match self.consume() {
             Some(Token::Identifier(type_name)) => match type_name.as_str() {
                 "int" => Ok(Type::Int),
                 // 他の型に対してもここで処理
-                _ => Err(ParserError::UnexpectedToken),
+                _ => Err(ParserError::UnexpectedToken {
+                    expected: String::from("int (or other type)"),
+                    found: type_name,
+                }),
             },
-            _ => Err(ParserError::UnexpectedToken),
+            Some(found) => Err(ParserError::UnexpectedToken {
+                expected: String::from("Identifier"),
+                found: format!("{:?}", found),
+            }),
+            None => Err(ParserError::UnexpectedEOF),
         }
     }
 
@@ -249,7 +280,7 @@ impl Parser {
                 self.expect_token(Token::Semicolon)?; // 代入文または式文の後にセミコロンを期待
                 stmt
             }
-            _ => return Err(ParserError::InvalidSyntax),
+            _ => return Err(ParserError::UnexpectedEOF),
         };
         Ok(statement)
     }
