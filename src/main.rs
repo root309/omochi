@@ -33,10 +33,13 @@ fn main() {
 
     // LLVMコンテキストの作成とIRジェネレータのインスタンス化
     let context = Context::create();
-    let ir_generator = IRGenerator::new(&context);
+    let mut ir_generator = IRGenerator::new(&context);
     let i32_type = context.i32_type();
     let fn_type = i32_type.fn_type(&[], false);
     let function = ir_generator.module.add_function("main", fn_type, None);
+
+    // エントリブロックの初期化
+    ir_generator.initialize_entry_block(&function);
 
     // 解析されたプログラム (AST) から LLVM IR を生成
     for statement in statements {

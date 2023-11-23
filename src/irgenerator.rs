@@ -16,6 +16,10 @@ pub struct IRGenerator<'a> {
 }
 
 impl<'a> IRGenerator<'a> {
+    pub fn initialize_entry_block(&mut self, function: &FunctionValue) {
+        let entry_block = self.context.append_basic_block(*function, "entry");
+        self.builder.position_at_end(entry_block);
+    }
     // Moduleの取得
     pub fn get_module(&self) -> &Module<'a> {
         &self.module
