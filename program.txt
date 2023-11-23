@@ -1,6 +1,1 @@
-{
-    let x = 5;
-    let y = x + 3;
-    print(y);
-}
-
+let x = 5;

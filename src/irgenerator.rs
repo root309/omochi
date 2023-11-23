@@ -40,9 +40,9 @@ impl<'a> IRGenerator<'a> {
     pub fn build_return(&self, value: inkwell::values::IntValue) {
         self.builder.build_return(Some(&value));
     }
-    // Statement タイプの IR を生成するメソッド
+    // StatementタイプのIRを生成するメソッド
     pub fn generate_ir_for_statement(
-        &self,
+        &mut self,
         statement: &Statement,
         function: &FunctionValue,
     ) -> inkwell::values::IntValue {
@@ -51,6 +51,70 @@ impl<'a> IRGenerator<'a> {
             Statement::Declaration(name, expr) => {
                 // 変数宣言のIRを生成
                 self.generate_declaration_ir(name, expr, function).unwrap();
+                self.context.i32_type().const_int(0, false)
+            }
+            Statement::Print(expr) => {
+                // exprを評価してvalue_to_printを生成
+                let value_to_print = self.generate_ir_inner(expr, function);
+
+                // printf関数の宣言
+                let printf_type = self
+                    .context
+                    .i8_type()
+                    .ptr_type(inkwell::AddressSpace::default())
+                    .fn_type(
+                        &[self
+                            .context
+                            .i8_type()
+                            .ptr_type(inkwell::AddressSpace::default())
+                            .into()],
+                        true,
+                    );
+
+                let printf_func = self.module.add_function("printf", printf_type, None);
+
+                // フォーマット文字列の定義
+                let format_str = self
+                    .builder
+                    .build_global_string_ptr("%d\n", "fmt")
+                    .expect("Failed to create format string");
+
+                // printf関数の呼び出し
+                self.builder.build_call(
+                    printf_func,
+                    &[format_str.as_pointer_value().into(), value_to_print.into()],
+                    "printf_call",
+                );
+
+                // Print文は値を返さないので、0を返す
+                self.context.i32_type().const_int(0, false)
+            }
+            Statement::If(condition, then_branch, else_branch) => {
+                // If文のIR生成ロジック
+                let condition_value = self.generate_ir_inner(condition, function);
+                let then_block = self.context.append_basic_block(*function, "then");
+                let else_block = self.context.append_basic_block(*function, "else");
+                let continue_block = self.context.append_basic_block(*function, "ifcont");
+
+                self.builder
+                    .build_conditional_branch(condition_value, then_block, else_block);
+
+                self.builder.position_at_end(then_block);
+                self.generate_ir_for_statement(then_branch, function);
+                self.builder.build_unconditional_branch(continue_block);
+
+                self.builder.position_at_end(else_block);
+                if let Some(else_stmt) = else_branch {
+                    self.generate_ir_for_statement(else_stmt, function);
+                }
+                self.builder.build_unconditional_branch(continue_block);
+
+                self.builder.position_at_end(continue_block);
+
+                self.context.i32_type().const_int(0, false)
+            }
+            Statement::Function(func) => {
+                // 関数定義のIR生成ロジック
                 self.context.i32_type().const_int(0, false)
             }
             _ => todo!("IR generation for other statement types"),
@@ -85,10 +149,13 @@ impl<'a> IRGenerator<'a> {
             // 変数の参照
             Expr::Variable(name) => {
                 // 変数のアドレスを取得
-                let variable_address = self.variables.get(name).expect("Variable not found");
+                let variable_address = match self.variables.get(name) {
+                    Some(address) => *address,
+                    None => panic!("Variable not found"),
+                };
 
-                // 変数の値をロードして `IntValue` に変換
-                match self.builder.build_load(*variable_address, name) {
+                // 変数の値をロードしてIntValueに変換
+                match self.builder.build_load(variable_address, name) {
                     Ok(value) => value.into_int_value(),
                     Err(_) => panic!("Failed to load variable value"),
                 }
@@ -174,23 +241,32 @@ impl<'a> IRGenerator<'a> {
     }
     // 変数宣言のIR生成
     fn generate_declaration_ir(
-        &self,
+        &mut self,
         name: &str,
         expr: &Expr,
         function: &FunctionValue,
     ) -> Result<(), String> {
-        let ir_value = self.generate_ir_inner(expr, function);
+        // 変数のアロケーションを作成
         let alloca = self.create_entry_block_alloca(function, name)?;
 
+        // 変数をハッシュマップに登録
+        self.variables.insert(name.to_string(), alloca);
+
+        // IR値を生成
+        let ir_value = self.generate_ir_inner(expr, function);
+
+        // IR値を変数にストア
         self.builder.build_store(alloca, ir_value);
+
         Ok(())
     }
+
     // ブロックの先頭に変数を割り当てるための関数
     fn create_entry_block_alloca(
-        &self,
+        &mut self,
         function: &FunctionValue,
         name: &str,
-    ) -> Result<PointerValue, String> {
+    ) -> Result<PointerValue<'a>, String> {
         let builder = self.context.create_builder();
 
         let entry = function
