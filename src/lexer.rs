@@ -53,6 +53,21 @@ impl<'a> Lexer<'a> {
                     tokens.push(Token::Equals);
                     self.next_char();
                 }
+                // 左括弧
+                '(' => {
+                    tokens.push(Token::LeftParen);
+                    self.next_char();
+                }
+                // 右括弧
+                ')' => {
+                    tokens.push(Token::RightParen);
+                    self.next_char();
+                }
+                // セミコロン
+                ';' => {
+                    tokens.push(Token::Semicolon); // セミコロンの解析
+                    self.next_char();
+                }
                 // 数字なら整数リテラルの解析を行う
                 '0'..='9' => tokens.push(self.integer()?),
                 // 英字またはアンダースコアなら識別子の解析を行う
