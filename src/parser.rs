@@ -36,7 +36,13 @@ impl Parser {
     fn peek(&self) -> Option<&Token> {
         self.tokens.get(self.current)
     }
-
+    fn peek_next(&self) -> Option<&Token> {
+        if self.current + 1 < self.tokens.len() {
+            Some(&self.tokens[self.current + 1])
+        } else {
+            None
+        }
+    }
     // 指定されたトークンを期待しているか確認し、そうでなければエラー
     fn expect_token(&mut self, expected: Token) -> Result<(), ParserError> {
         let token = self.consume().ok_or(ParserError::UnexpectedEOF)?;
@@ -68,16 +74,32 @@ impl Parser {
 
     // 単項式(数字など基本的な要素)の解析
     fn parse_primary(&mut self) -> Result<Expr, ParserError> {
-        match self.tokens.get(self.current) {
+        match self.peek().cloned() {
             Some(Token::Integer(value)) => {
-                self.current += 1;
-                Ok(Expr::Integer(*value))
+                self.consume();
+                Ok(Expr::Integer(value))
             }
-            Some(found) => Err(ParserError::UnexpectedToken {
-                expected: format!("{:?}", Token::Integer(0)), // ここでは具体的な数字ではなく、一般的な整数トークンを期待していることを示す
-                found: format!("{:?}", found),
+            Some(Token::LeftParen) => {
+                self.consume(); // 左括弧を消費
+                let expr = self.parse_expression()?; // 括弧内の式を解析
+                self.expect_token(Token::RightParen)?; // 対応する右括弧を期待
+                Ok(expr)
+            }
+            Some(Token::Identifier(ref name)) if self.peek_next() == Some(&Token::LeftParen) => {
+                self.consume(); // 関数名を消費
+                self.consume(); // 左括弧を消費
+                                // 引数リストの解析など...
+                self.expect_token(Token::RightParen)?; // 対応する右括弧を期待
+                Ok(Expr::FunctionCall(name.clone(), vec![])) // 一時的な実装
+            }
+            Some(Token::Identifier(name)) => {
+                self.consume();
+                Ok(Expr::Variable(name))
+            }
+            _ => Err(ParserError::UnexpectedToken {
+                expected: String::from("Integer, LeftParen, Identifier, or FunctionCall"),
+                found: format!("{:?}", self.peek()),
             }),
-            None => Err(ParserError::UnexpectedEOF),
         }
     }
 
