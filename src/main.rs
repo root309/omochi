@@ -12,12 +12,9 @@ use parser::Parser;
 use std::fs;
 
 fn main() {
-    // 読み込むソースファイルの名前
     let filename = "program.txt";
-    // ファイルからソースコードを読み込む
     let input = fs::read_to_string(filename).expect("Failed to read file");
 
-    // 字句解析器のインスタンス化と字句解析の実行
     let mut lexer = Lexer::new(&input);
     let tokens = match lexer.lex() {
         Ok(t) => t,
@@ -27,7 +24,6 @@ fn main() {
         }
     };
 
-    // 構文解析器のインスタンス化とASTの構築
     let mut parser = Parser::new(tokens);
     let statements = match parser.parse_block() {
         Ok(statements) => statements,
@@ -36,6 +32,12 @@ fn main() {
             return;
         }
     };
+
+    // インタープリタのインスタンス化とプログラムの実行
+    let mut interpreter = Interpreter::new();
+    for statement in &statements {
+        interpreter.interpret_statement(statement);
+    }
 
     // LLVMコンテキストの作成とIRジェネレータのインスタンス化
     let context = Context::create();
