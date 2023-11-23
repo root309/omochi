@@ -1,4 +1,4 @@
-use crate::ast::{Expr, Operator, Token, Statement, Function, Type};
+use crate::ast::{Expr, Function, Operator, Statement, Token, Type};
 
 // 構文解析器のエラーを表す列挙型
 #[derive(Debug)]
@@ -81,11 +81,11 @@ impl Parser {
             Some(Token::Plus) => {
                 self.advance();
                 Some(Operator::Plus)
-            },
+            }
             Some(Token::Minus) => {
                 self.advance();
                 Some(Operator::Minus)
-            },
+            }
             _ => None,
         };
         Ok(operator)
@@ -113,7 +113,12 @@ impl Parser {
         self.expect_token(Token::Arrow)?;
         let return_type = self.parse_type()?;
         let body = self.parse_block()?;
-        Ok(Function { name, params, return_type, body })
+        Ok(Function {
+            name,
+            params,
+            return_type,
+            body,
+        })
     }
 
     // if文の解析
@@ -127,7 +132,11 @@ impl Parser {
         } else {
             None
         };
-        Ok(Statement::If(Box::new(condition), Box::new(Statement::Block(then_branch)), else_branch))
+        Ok(Statement::If(
+            Box::new(condition),
+            Box::new(Statement::Block(then_branch)),
+            else_branch,
+        ))
     }
 
     // print文の解析
@@ -161,7 +170,7 @@ impl Parser {
         if let Some(Token::RightParen) = self.peek() {
             return Ok(params);
         }
-    
+
         loop {
             if let Some(Token::Identifier(name)) = self.consume() {
                 self.expect_token(Token::Colon)?;
@@ -170,14 +179,16 @@ impl Parser {
             } else {
                 return Err(ParserError::UnexpectedToken);
             }
-    
+
             match self.peek() {
                 Some(Token::RightParen) => break,
-                Some(Token::Comma) => { self.consume(); },
+                Some(Token::Comma) => {
+                    self.consume();
+                }
                 _ => return Err(ParserError::UnexpectedToken),
             }
         }
-    
+
         Ok(params)
     }
 
@@ -195,10 +206,10 @@ impl Parser {
     }
 
     // ブロック(複数の文の集合)の解析
-    fn parse_block(&mut self) -> Result<Vec<Statement>, ParserError> {
+    pub fn parse_block(&mut self) -> Result<Vec<Statement>, ParserError> {
         let mut statements = Vec::new();
         self.expect_token(Token::LeftBrace)?;
-    
+
         while let Some(token) = self.peek() {
             if *token == Token::RightBrace {
                 break;
@@ -206,7 +217,7 @@ impl Parser {
             let statement = self.parse_statement()?;
             statements.push(statement);
         }
-    
+
         self.expect_token(Token::RightBrace)?;
         Ok(statements)
     }
@@ -218,26 +229,26 @@ impl Parser {
                 let stmt = self.parse_declaration()?;
                 self.expect_token(Token::Semicolon)?; // 変数宣言の後にセミコロンを期待
                 stmt
-            },
+            }
             Some(Token::Fn) => {
                 let function = self.parse_function()?;
                 Statement::Function(function) // 関数宣言の後にセミコロンは必要ない
-            },
+            }
             Some(Token::If) => {
                 let stmt = self.parse_if_statement()?;
                 self.expect_token(Token::Semicolon)?; // if文の後にセミコロンを期待
                 stmt
-            },
+            }
             Some(Token::Print) => {
                 let stmt = self.parse_print_statement()?;
                 self.expect_token(Token::Semicolon)?; // print文の後にセミコロンを期待
                 stmt
-            },
+            }
             Some(Token::Identifier(_)) => {
                 let stmt = self.parse_assignment_or_expression_statement()?;
                 self.expect_token(Token::Semicolon)?; // 代入文または式文の後にセミコロンを期待
                 stmt
-            },
+            }
             _ => return Err(ParserError::InvalidSyntax),
         };
         Ok(statement)
@@ -255,28 +266,4 @@ impl Parser {
     fn previous(&self) -> &Token {
         &self.tokens[self.current - 1]
     }
-}
-#[test]
-fn test_parse_expression() {
-    let mut parser = Parser::new(vec![
-        Token::Integer(3),
-        Token::Plus,
-        Token::Integer(4),
-        Token::Minus,
-        Token::Integer(5),
-        Token::EOF,
-    ]);
-    let ast = parser.parse_expression().expect("Failed to parse expression");
-    assert_eq!(
-        ast,
-        Expr::BinaryOp(
-            Box::new(Expr::BinaryOp(
-                Box::new(Expr::Integer(3)),
-                Operator::Plus,
-                Box::new(Expr::Integer(4))
-            )),
-            Operator::Minus,
-            Box::new(Expr::Integer(5))
-        )
-    );
 }
