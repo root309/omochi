@@ -1,12 +1,10 @@
 mod ast;
-mod interpreter;
 mod irgenerator;
 mod lexer;
 mod parser;
 
 use crate::irgenerator::IRGenerator;
 use inkwell::context::Context;
-use interpreter::Interpreter;
 use lexer::Lexer;
 use parser::Parser;
 use std::fs;
@@ -32,12 +30,6 @@ fn main() {
             return;
         }
     };
-
-    // インタープリタのインスタンス化とプログラムの実行
-    let mut interpreter = Interpreter::new();
-    for statement in &statements {
-        interpreter.interpret_statement(statement);
-    }
 
     // LLVMコンテキストの作成とIRジェネレータのインスタンス化
     let context = Context::create();
