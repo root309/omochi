@@ -46,21 +46,11 @@ impl<'a> IRGenerator<'a> {
             Statement::Expression(expr) => self.generate_ir_inner(expr, function),
             Statement::Declaration(name, expr) => {
                 // 変数宣言のIRを生成
-                let ir_value = self.generate_ir_inner(expr, function);
-                let alloca = self.create_entry_block_alloca(function, name).unwrap();
-                self.builder.build_store(alloca, ir_value);
+                self.generate_declaration_ir(name, expr, function).unwrap();
                 self.context.i32_type().const_int(0, false)
             }
-            // 他のStatementタイプに対するIR生成はここに実装
             _ => todo!("IR generation for other statement types"),
         }
-    }
-    // IRの生成メインロジック
-    pub fn generate_ir(&self, expr: &Expr, function: &FunctionValue) -> inkwell::values::IntValue {
-        let entry = self.context.append_basic_block(*function, "entry");
-        self.builder.position_at_end(entry);
-
-        self.generate_ir_inner(expr, function)
     }
     // 再帰的にASTを走査してIRを生成
     fn generate_ir_inner(
