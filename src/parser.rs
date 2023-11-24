@@ -21,15 +21,10 @@ impl Parser {
     }
 
     // トークン列から次のトークンを取得し、カーソルを進める
-    // 次のトークンを消費して、カーソルを進める
     fn consume(&mut self) -> Option<Token> {
-        if self.is_at_end() {
-            None
-        } else {
-            let token = self.tokens[self.current].clone();
-            self.current += 1;
-            Some(token)
-        }
+        let token = self.tokens.get(self.current)?.clone();
+        self.current += 1;
+        Some(token)
     }
 
     // 現在のトークンを取得(消費しない)
@@ -37,10 +32,19 @@ impl Parser {
         self.tokens.get(self.current)
     }
     fn peek_next(&self) -> Option<&Token> {
-        if self.current + 1 < self.tokens.len() {
-            Some(&self.tokens[self.current + 1])
+        self.tokens.get(self.current + 1)
+    }
+    // 現在のトークンが指定したトークンかどうかを確認
+    fn check(&self, token: Token) -> bool {
+        self.peek().map_or(false, |t| *t == token)
+    }
+    // 指定したトークンが現在のトークンであれば、それを消費して true を返す
+    fn match_token(&mut self, token: Token) -> bool {
+        if self.check(token) {
+            self.consume();
+            true
         } else {
-            None
+            false
         }
     }
     // 指定されたトークンを期待しているか確認し、そうでなければエラー
@@ -59,16 +63,32 @@ impl Parser {
     fn is_at_end(&self) -> bool {
         matches!(self.peek(), Some(Token::EOF) | None)
     }
-
+    // 問題ではなさそう
     // 式の解析
     pub fn parse_expression(&mut self) -> Result<Expr, ParserError> {
         let mut expr = self.parse_primary()?;
-
+    
         while let Some(op) = self.next_operator()? {
-            let right = self.parse_primary()?;
-            expr = Expr::BinaryOp(Box::new(expr), op, Box::new(right));
+            println!("Operator: {:?}", op); // 追加するデバッグ出力
+            match op {
+                Operator::Equals => {
+                    if let Expr::Variable(name) = expr {
+                        self.consume(); // '=' トークンを消費する
+                        println!("Parsing assignment, current token: {:?}", self.peek()); // 追加するデバッグ出力
+                        let rhs = self.parse_expression()?; // 右辺の式を解析
+                        expr = Expr::Assign(name, Box::new(rhs));
+                        println!("Parsed assignment, current token: {:?}", self.peek()); // 追加するデバッグ出力
+                    } else {
+                        return Err(ParserError::InvalidSyntax);
+                    }
+                }
+                _ => {
+                    let rhs = self.parse_primary()?;
+                    expr = Expr::BinaryOp(Box::new(expr), op, Box::new(rhs));
+                }
+            }
         }
-
+    
         Ok(expr)
     }
 
@@ -88,9 +108,8 @@ impl Parser {
             Some(Token::Identifier(ref name)) if self.peek_next() == Some(&Token::LeftParen) => {
                 self.consume(); // 関数名を消費
                 self.consume(); // 左括弧を消費
-                                // 引数リストの解析など...
                 self.expect_token(Token::RightParen)?; // 対応する右括弧を期待
-                Ok(Expr::FunctionCall(name.clone(), vec![])) // 一時的な実装
+                Ok(Expr::FunctionCall(name.clone(), vec![]))
             }
             Some(Token::Identifier(name)) => {
                 self.consume();
@@ -113,6 +132,18 @@ impl Parser {
             Some(Token::Minus) => {
                 self.advance();
                 Some(Operator::Minus)
+            }
+            Some(Token::MoreThan) => {
+                self.consume();
+                Some(Operator::MoreThan)
+            }
+            Some(Token::LessThan) => {
+                self.consume();
+                Some(Operator::LessThan)
+            }
+            Some(Token::Asterisk) => {
+                self.consume();
+                Some(Operator::Multiply)
             }
             _ => None,
         };
@@ -154,21 +185,40 @@ impl Parser {
             body,
         })
     }
-
+    // 正しく解析されている
     // if文の解析
     fn parse_if_statement(&mut self) -> Result<Statement, ParserError> {
         self.expect_token(Token::If)?;
         let condition = self.parse_expression()?;
-        let then_branch = self.parse_block()?;
-        let else_branch = if let Some(Token::Else) = self.peek() {
-            self.consume();
-            Some(Box::new(Statement::Block(self.parse_block()?)))
+    
+        self.expect_token(Token::LeftBrace)?;
+        let mut then_statements = Vec::new();
+        while !self.check(Token::RightBrace) && !self.is_at_end() {
+            then_statements.push(self.parse_statement()?);
+            if !self.check(Token::RightBrace) {
+                self.expect_token(Token::Semicolon)?;
+            }
+        }
+        self.expect_token(Token::RightBrace)?;
+    
+        let else_branch = if self.match_token(Token::Else) {
+            self.expect_token(Token::LeftBrace)?;
+            let mut else_statements = Vec::new();
+            while !self.check(Token::RightBrace) && !self.is_at_end() {
+                else_statements.push(self.parse_statement()?);
+                if !self.check(Token::RightBrace) {
+                    self.expect_token(Token::Semicolon)?;
+                }
+            }
+            self.expect_token(Token::RightBrace)?;
+            Some(Box::new(Statement::Block(else_statements)))
         } else {
             None
         };
+    
         Ok(Statement::If(
             Box::new(condition),
-            Box::new(Statement::Block(then_branch)),
+            Box::new(Statement::Block(then_statements)),
             else_branch,
         ))
     }
@@ -179,16 +229,19 @@ impl Parser {
         let expr = self.parse_expression()?;
         Ok(Statement::Print(expr))
     }
-
+    // 正しい挙動
     // 代入または式の文の解析
     fn parse_assignment_or_expression_statement(&mut self) -> Result<Statement, ParserError> {
         let expr = self.parse_expression()?;
-        if let Expr::Assign(name, value) = expr {
-            Ok(Statement::Assignment(name, *value))
-        } else {
-            Ok(Statement::Expression(expr))
+        match expr {
+            Expr::Assign(name, value) => {
+                self.expect_token(Token::Semicolon)?; // 代入文の後にセミコロンを期待
+                Ok(Statement::Assignment(name, *value))
+            }
+            _ => Ok(Statement::Expression(expr)),
         }
     }
+
     // 識別子の解析
     fn parse_identifier(&mut self) -> Result<String, ParserError> {
         match self.consume() {
@@ -268,55 +321,112 @@ impl Parser {
                 break;
             }
             let statement = self.parse_statement()?;
+            // 最後の式の場合、セミコロンを必要としないことをチェック
+            if self.is_at_end() || *self.peek().unwrap() == Token::RightBrace {
+                statements.push(statement);
+                break;
+            }
+            // それ以外の場合、セミコロンを期待
+            self.expect_token(Token::Semicolon)?;
             statements.push(statement);
         }
 
         self.expect_token(Token::RightBrace)?;
         Ok(statements)
     }
-
+    // ブロック内の文の解析
+    fn parse_block_contents(&mut self) -> Result<Vec<Statement>, ParserError> {
+        let mut statements = Vec::new();
+        while !self.check(Token::RightBrace) && !self.is_at_end() {
+            statements.push(self.parse_statement()?);
+            if !self.check(Token::RightBrace) {
+                self.expect_token(Token::Semicolon)?;
+            }
+        }
+        Ok(statements)
+    }
     // 文の解析
     fn parse_statement(&mut self) -> Result<Statement, ParserError> {
-        let statement = match self.peek() {
+        match self.peek() {
             Some(Token::Let) => {
                 let stmt = self.parse_declaration()?;
                 self.expect_token(Token::Semicolon)?; // 変数宣言の後にセミコロンを期待
-                stmt
+                Ok(stmt)
             }
-            Some(Token::Fn) => {
-                let function = self.parse_function()?;
-                Statement::Function(function) // 関数宣言の後にセミコロンは必要ない
-            }
-            Some(Token::If) => {
-                let stmt = self.parse_if_statement()?;
-                self.expect_token(Token::Semicolon)?; // if文の後にセミコロンを期待
-                stmt
-            }
+            Some(Token::Fn) => Ok(Statement::Function(self.parse_function()?)),
+            Some(Token::If) => self.parse_if_statement(),
             Some(Token::Print) => {
                 let stmt = self.parse_print_statement()?;
                 self.expect_token(Token::Semicolon)?; // print文の後にセミコロンを期待
-                stmt
+                Ok(stmt)
             }
             Some(Token::Identifier(_)) => {
                 let stmt = self.parse_assignment_or_expression_statement()?;
                 self.expect_token(Token::Semicolon)?; // 代入文または式文の後にセミコロンを期待
-                stmt
+                Ok(stmt)
             }
-            _ => return Err(ParserError::UnexpectedEOF),
-        };
-        Ok(statement)
+            _ => Err(ParserError::UnexpectedEOF),
+        }
     }
 
     // カーソルを進める補助関数
-    fn advance(&mut self) -> &Token {
-        if !self.is_at_end() {
-            self.current += 1;
-        }
-        self.previous()
+    fn advance(&mut self) {
+        self.consume();
     }
 
     // 直前のトークンを取得する補助関数
     fn previous(&self) -> &Token {
         &self.tokens[self.current - 1]
     }
+}
+#[cfg(test)]
+mod tests {
+    use crate::ast::{Expr, Function, Statement, Type};
+    use crate::lexer::Lexer;
+    use crate::parser::Parser;
+
+    fn parse(input: &str) -> Result<Vec<Statement>, String> {
+        let mut lexer = Lexer::new(input);
+        let tokens = lexer.lex().map_err(|e| e.to_string())?;
+        let mut parser = Parser::new(tokens);
+        parser.parse_block().map_err(|e| format!("{:?}", e))
+    }
+
+    #[test]
+    fn test_empty_block() {
+        let statements = parse("{}").expect("Failed to parse");
+        assert!(statements.is_empty());
+    }
+
+    // ... 他のテストケースも同様に修正 ...
+
+    #[test]
+    fn test_if_statement() {
+        let statements = parse("{ if x > 5 { x = 10; } }").expect("Failed to parse if statement");
+        assert_eq!(statements.len(), 1);
+        // Further checks for if statement
+    }
+
+    #[test]
+    fn test_function_definition() {
+        let statements = parse("{ fn add(x: int, y: int) -> int { x + y; } }")
+            .expect("Failed to parse function definition");
+        assert_eq!(statements.len(), 1);
+        if let Statement::Function(Function {
+            name,
+            params,
+            return_type,
+            body,
+        }) = &statements[0]
+        {
+            assert_eq!(name, "add");
+            assert_eq!(params.len(), 2);
+            assert_eq!(*return_type, Type::Int);
+            // Further checks for function body
+        } else {
+            panic!("Expected a function statement");
+        }
+    }
+
+    // ... 他のテストケースも同様に修正 ...
 }
