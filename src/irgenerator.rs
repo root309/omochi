@@ -5,6 +5,7 @@ use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::module::Module;
 use inkwell::values::{FunctionValue, PointerValue};
+use inkwell::IntPredicate;
 use std::collections::HashMap;
 
 // IR生成器の構造体
@@ -142,8 +143,25 @@ impl<'a> IRGenerator<'a> {
                         .builder
                         .build_int_sub(left_val, right_val, "subtmp")
                         .expect("Failed to subtract values"),
-                    // ここに等値比較のIR生成ロジックを実装
-                    Operator::Equals => todo!(),
+                    // 等値比較のIR生成
+                    Operator::Equals => self
+                        .builder
+                        .build_int_compare(IntPredicate::EQ, left_val, right_val, "eqtmp")
+                        .expect("Failed to compare values for equality"),
+                    Operator::Multiply => {
+                        // 乗算のIRコード生成
+                        self.builder
+                            .build_int_mul(left_val, right_val, "multmp")
+                            .expect("Failed to multiply values")
+                    }
+                    Operator::MoreThan => self
+                        .builder
+                        .build_int_compare(IntPredicate::SGT, left_val, right_val, "gttmp")
+                        .expect("Failed to compare values"),
+                    Operator::LessThan => self
+                        .builder
+                        .build_int_compare(IntPredicate::SLT, left_val, right_val, "lttmp")
+                        .expect("Failed to compare values"),
                 }
             }
             // 変数の参照

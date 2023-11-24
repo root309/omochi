@@ -1,27 +1,30 @@
 // トークンの種類を定義する列挙型
 #[derive(Debug, PartialEq, Clone)]
 pub enum Token {
-    Let,               // `let` キーワード
-    Fn,                // 関数
-    If,                // if文
-    Else,              // Else
-    Print,             // print文
-    Identifier(String),// 識別子
-    Integer(i64),      // 整数リテラル
-    Plus,              // 加算演算子
-    Minus,             // 減算演算子
-    Equals,            // 等号
-    DoubleEquals,      // 等値比較 `==`
-    Semicolon,         // セミコロン ;
-    Colon,             // コロン :
-    Comma,             // カンマ ,
-    Then,              // then
-    LeftParen,         // 左括弧 `(`
-    RightParen,        // 右括弧 `)`
-    Arrow,             // 矢印 `->`
-    LeftBrace,         // 左中括弧 `{`
-    RightBrace,        // 右中括弧 `}`
-    EOF,               // 入力の終了
+    Let,                // `let` キーワード
+    Fn,                 // 関数
+    If,                 // if文
+    Else,               // Else
+    Print,              // print文
+    Identifier(String), // 識別子
+    Integer(i64),       // 整数リテラル
+    Plus,               // 加算演算子
+    Minus,              // 減算演算子
+    Equals,             // 等号
+    DoubleEquals,       // 等値比較 `==`
+    Asterisk,           // アスタリスク'*'
+    Semicolon,          // セミコロン ;
+    Colon,              // コロン :
+    Comma,              // カンマ ,
+    Then,               // then
+    LeftParen,          // 左括弧 `(`
+    RightParen,         // 右括弧 `)`
+    Arrow,              // 矢印 `->`
+    LeftBrace,          // 左中括弧 `{`
+    RightBrace,         // 右中括弧 `}`
+    MoreThan,           // 大なり >
+    LessThan,           // 小なり <
+    EOF,                // 入力の終了
 }
 
 // 式を表す列挙型
@@ -68,4 +71,7 @@ pub enum Operator {
     Plus,
     Minus,
     Equals,
+    Multiply,
+    MoreThan,
+    LessThan,
 }
