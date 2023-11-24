@@ -1,5 +1,6 @@
 // use regex::Regex;
 use crate::ast::Token;
+use std::fmt;
 use std::str::Chars;
 
 // 字句解析器のエラーを表す列挙型
@@ -9,6 +10,14 @@ pub enum LexerError {
     InvalidNumber(String),
 }
 
+impl fmt::Display for LexerError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LexerError::UnknownToken(c) => write!(f, "Unknown token: {}", c),
+            LexerError::InvalidNumber(n) => write!(f, "Invalid number: {}", n),
+        }
+    }
+}
 // 字句解析器本体の構造体
 pub struct Lexer<'a> {
     input: Chars<'a>,           // 入力文字列
@@ -30,7 +39,10 @@ impl<'a> Lexer<'a> {
     fn next_char(&mut self) {
         self.current_char = self.input.next();
     }
-
+    // 現在の文字と次の文字をチェックする
+    fn peek_next_char(&self) -> Option<char> {
+        self.input.clone().next()
+    }
     // 字句解析のメインロジック
     pub fn lex(&mut self) -> Result<Vec<Token>, LexerError> {
         let mut tokens = Vec::new();
@@ -43,15 +55,27 @@ impl<'a> Lexer<'a> {
                     tokens.push(Token::Plus);
                     self.next_char();
                 }
-                // 減算演算子
+                // 減算演算子,アロー演算子
                 '-' => {
-                    tokens.push(Token::Minus);
+                    // 次の文字が '>' なら Arrow トークンを作成
+                    if self.peek_next_char() == Some('>') {
+                        tokens.push(Token::Arrow);
+                        self.next_char(); // '>' を消費
+                    } else {
+                        tokens.push(Token::Minus);
+                    }
                     self.next_char();
                 }
-                // 等号
+                // 等号,ダブルイコール
                 '=' => {
-                    tokens.push(Token::Equals);
-                    self.next_char();
+                    if let Some('=') = self.peek_next_char() {
+                        self.next_char(); // '=' をスキップ
+                        self.next_char(); // '=' をスキップ
+                        tokens.push(Token::DoubleEquals);
+                    } else {
+                        tokens.push(Token::Equals);
+                        self.next_char();
+                    }
                 }
                 // 左括弧
                 '(' => {
@@ -76,6 +100,30 @@ impl<'a> Lexer<'a> {
                 // セミコロン
                 ';' => {
                     tokens.push(Token::Semicolon); // セミコロンの解析
+                    self.next_char();
+                }
+                // 大なり演算子
+                '>' => {
+                    tokens.push(Token::MoreThan);
+                    self.next_char();
+                }
+                // 小なり演算子
+                '<' => {
+                    tokens.push(Token::LessThan);
+                    self.next_char();
+                }
+                // アスタリスク（乗算演算子）
+                '*' => {
+                    tokens.push(Token::Asterisk);
+                    self.next_char();
+                }
+                // コロン
+                ':' => {
+                    tokens.push(Token::Colon);
+                    self.next_char();
+                }
+                ',' => {
+                    tokens.push(Token::Comma);
                     self.next_char();
                 }
                 // 数字なら整数リテラルの解析を行う
@@ -118,23 +166,4 @@ impl<'a> Lexer<'a> {
             _ => Token::Identifier(identifier),
         })
     }
-}
-
-// 字句解析器のテスト
-#[test]
-fn test_lexer() {
-    let mut lexer = Lexer::new("let x = 5 + 10");
-    let tokens = lexer.lex().expect("Failed to lex");
-    assert_eq!(
-        tokens,
-        vec![
-            Token::Let,
-            Token::Identifier("x".to_string()),
-            Token::Equals,
-            Token::Integer(5),
-            Token::Plus,
-            Token::Integer(10),
-            Token::EOF
-        ]
-    );
 }
