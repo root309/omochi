@@ -73,9 +73,14 @@ impl Parser {
             match op {
                 Operator::Equals => {
                     if let Expr::Variable(name) = expr {
+                        println!("Parsing assignment, current token: {:?}", self.peek());
                         self.consume(); // '=' トークンを消費する
                         let rhs = self.parse_expression()?; // 右辺の式を解析
                         expr = Expr::Assign(name, Box::new(rhs));
+                        println!(
+                            "Finished parsing assignment, current token: {:?}",
+                            self.peek()
+                        );
                     } else {
                         return Err(ParserError::InvalidSyntax);
                     }
@@ -198,10 +203,7 @@ impl Parser {
             self.peek()
         );
         self.expect_token(Token::RightBrace)?;
-        println!(
-            "Finished parsing if statement, current token: {:?}",
-            self.peek()
-        );
+
         let else_branch = if self.match_token(Token::Else) {
             println!("Parsing else branch, current token: {:?}", self.peek());
             self.expect_token(Token::LeftBrace)?;
@@ -215,6 +217,7 @@ impl Parser {
         } else {
             None
         };
+
         println!(
             "Finished parsing if statement, current token: {:?}",
             self.peek()
@@ -235,14 +238,21 @@ impl Parser {
     // 正しい挙動
     // 代入または式の文の解析
     fn parse_assignment_or_expression_statement(&mut self) -> Result<Statement, ParserError> {
-        let expr = self.parse_expression()?;
-        match expr {
-            Expr::Assign(name, value) => {
-                self.expect_token(Token::Semicolon)?; // 代入文の後にセミコロンを期待
-                Ok(Statement::Assignment(name, *value))
+        let left = self.parse_expression()?; // 左辺の式を解析
+        if let Some(Token::Equals) = self.peek() {
+            // Equals トークンがある場合は代入文として処理
+            self.consume(); // Equals トークンを消費
+            let right = self.parse_expression()?; // 右辺の式を解析
+            self.expect_token(Token::Semicolon)?; // 代入文の後にセミコロンを期待
+            if let Expr::Variable(name) = left {
+                return Ok(Statement::Assignment(name, right));
+            } else {
+                return Err(ParserError::InvalidSyntax);
             }
-            _ => Ok(Statement::Expression(expr)),
         }
+        // Equals トークンがない場合は式として処理
+        self.expect_token(Token::Semicolon)?; // 式の後にセミコロンを期待
+        Ok(Statement::Expression(left))
     }
 
     // 識別子の解析
@@ -354,11 +364,20 @@ impl Parser {
     fn parse_block_contents(&mut self) -> Result<Vec<Statement>, ParserError> {
         let mut statements = Vec::new();
         while !self.check(Token::RightBrace) && !self.is_at_end() {
+            println!(
+                "Parsing statement in block, current token: {:?}",
+                self.peek()
+            );
             let statement = self.parse_statement()?;
+            println!(
+                "Finished parsing statement in block, current token: {:?}",
+                self.peek()
+            );
 
             // `If` ステートメントの後にはセミコロンを期待しない
             if !matches!(&statement, Statement::If(..)) {
                 if !self.check(Token::RightBrace) && self.peek() != Some(&Token::Else) {
+                    println!("Expecting semicolon, current token: {:?}", self.peek());
                     self.expect_token(Token::Semicolon)?;
                 }
             }
@@ -397,7 +416,16 @@ impl Parser {
                 self.expect_token(Token::Semicolon)?; // print文の後にセミコロンを期待
                 Ok(stmt)
             }
-            Some(Token::Identifier(_)) => self.parse_assignment_or_expression_statement(),
+            Some(Token::Identifier(_)) if self.peek_next() == Some(&Token::Equals) => {
+                // Identifier トークンの後に Equals が来た場合（代入文）
+                self.parse_assignment_or_expression_statement()
+            }
+            Some(Token::Identifier(_)) => {
+                // Identifier トークンの後に Equals 以外が来た場合（式）
+                let expr = self.parse_expression()?;
+                self.expect_token(Token::Semicolon)?; // 式の後にセミコロンを期待
+                Ok(Statement::Expression(expr))
+            }
             _ => Err(ParserError::UnexpectedEOF),
         };
         println!(
