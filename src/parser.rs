@@ -324,28 +324,32 @@ impl Parser {
                 break;
             }
 
-            println!("Parsing block, current token: {:?}", self.peek());
+            println!(
+                "Before parsing statement in block, current token: {:?}",
+                self.peek()
+            );
             let statement = self.parse_statement()?;
+            println!(
+                "After parsing statement in block, current token: {:?}",
+                self.peek()
+            );
 
-            // `If` ステートメントの後にはセミコロンを期待しない
             let is_if_statement = matches!(&statement, Statement::If(..));
 
-            // statement をベクトルに追加する前にセミコロンをチェック
-            if !is_if_statement
-                && self.peek() != Some(&Token::Else)
-                && !self.check(Token::RightBrace)
-            {
-                println!("Expecting semicolon, current token: {:?}", self.peek());
-                self.expect_token(Token::Semicolon)?;
+            if !is_if_statement && !self.check(Token::RightBrace) {
+                if self.peek() != Some(&Token::Else) && self.peek() != Some(&Token::If) {
+                    println!("Expecting semicolon, current token: {:?}", self.peek());
+                    self.expect_token(Token::Semicolon)?;
+                }
             }
 
             statements.push(statement);
-            println!("Finished parsing block, current token: {:?}", self.peek());
         }
 
         self.expect_token(Token::RightBrace)?;
         Ok(statements)
     }
+
     // ブロック内の文の解析
     fn parse_block_contents(&mut self) -> Result<Vec<Statement>, ParserError> {
         let mut statements = Vec::new();
@@ -375,6 +379,10 @@ impl Parser {
             }
             Some(Token::Fn) => Ok(Statement::Function(self.parse_function()?)),
             Some(Token::If) => {
+                println!(
+                    "Before parsing if statement, current token: {:?}",
+                    self.peek()
+                );
                 let stmt = self.parse_if_statement()?;
                 println!(
                     // ここ呼ばれてないWTF
