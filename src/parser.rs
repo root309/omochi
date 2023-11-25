@@ -23,6 +23,7 @@ impl Parser {
     // トークン列から次のトークンを取得し、カーソルを進める
     fn consume(&mut self) -> Option<Token> {
         let token = self.tokens.get(self.current)?.clone();
+        println!("Consuming token: {:?}", token);
         self.current += 1;
         Some(token)
     }
@@ -185,6 +186,7 @@ impl Parser {
     // 正しく解析されている
     // if文の解析
     fn parse_if_statement(&mut self) -> Result<Statement, ParserError> {
+        println!("Parsing if statement, current token: {:?}", self.peek());
         self.expect_token(Token::If)?;
         let condition = self.parse_expression()?;
         self.expect_token(Token::LeftBrace)?;
@@ -199,7 +201,10 @@ impl Parser {
         } else {
             None
         };
-
+        println!(
+            "Finished parsing if statement, current token: {:?}",
+            self.peek()
+        );
         Ok(Statement::If(
             Box::new(condition),
             Box::new(Statement::Block(then_branch)),
@@ -331,6 +336,7 @@ impl Parser {
     }
     // 文の解析
     fn parse_statement(&mut self) -> Result<Statement, ParserError> {
+        println!("Parsing statement, current token: {:?}", self.peek());
         match self.peek() {
             Some(Token::Let) => {
                 let stmt = self.parse_declaration()?;
