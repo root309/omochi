@@ -411,6 +411,21 @@ impl Parser {
                 // If ステートメントの後にはセミコロンを期待しない
                 Ok(stmt)
             }
+            Some(Token::Else) => {
+                self.consume(); // "else" トークンを消費
+                if self.match_token(Token::LeftBrace) {
+                    // LeftBrace トークンを正しくマッチング
+                    let else_branch = self.parse_block_contents()?;
+                    self.expect_token(Token::RightBrace)?; // 対応する RightBrace トークンを期待
+                    Ok(Statement::Block(else_branch))
+                } else {
+                    // LeftBrace トークンがない場合のエラー処理
+                    Err(ParserError::UnexpectedToken {
+                        expected: String::from("LeftBrace"),
+                        found: format!("{:?}", self.peek()),
+                    })
+                }
+            }
             Some(Token::Print) => {
                 let stmt = self.parse_print_statement()?;
                 self.expect_token(Token::Semicolon)?; // print文の後にセミコロンを期待
