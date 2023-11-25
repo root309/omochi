@@ -190,12 +190,26 @@ impl Parser {
         self.expect_token(Token::If)?;
         let condition = self.parse_expression()?;
         self.expect_token(Token::LeftBrace)?;
-        let then_branch = self.parse_block_contents()?;
-        self.expect_token(Token::RightBrace)?;
 
+        println!("Parsing then branch, current token: {:?}", self.peek());
+        let then_branch = self.parse_block_contents()?;
+        println!(
+            "Finished parsing then branch, current token: {:?}",
+            self.peek()
+        );
+        self.expect_token(Token::RightBrace)?;
+        println!(
+            "Finished parsing if statement, current token: {:?}",
+            self.peek()
+        );
         let else_branch = if self.match_token(Token::Else) {
+            println!("Parsing else branch, current token: {:?}", self.peek());
             self.expect_token(Token::LeftBrace)?;
             let else_statements = self.parse_block_contents()?;
+            println!(
+                "Finished parsing else branch, current token: {:?}",
+                self.peek()
+            );
             self.expect_token(Token::RightBrace)?;
             Some(Box::new(Statement::Block(else_statements)))
         } else {
@@ -309,15 +323,24 @@ impl Parser {
             if *token == Token::RightBrace {
                 break;
             }
+
+            println!("Parsing block, current token: {:?}", self.peek());
             let statement = self.parse_statement()?;
-            // 最後の式の場合、セミコロンを必要としないことをチェック
-            if self.is_at_end() || *self.peek().unwrap() == Token::RightBrace {
-                statements.push(statement);
-                break;
+
+            // `If` ステートメントの後にはセミコロンを期待しない
+            let is_if_statement = matches!(&statement, Statement::If(..));
+
+            // statement をベクトルに追加する前にセミコロンをチェック
+            if !is_if_statement
+                && self.peek() != Some(&Token::Else)
+                && !self.check(Token::RightBrace)
+            {
+                println!("Expecting semicolon, current token: {:?}", self.peek());
+                self.expect_token(Token::Semicolon)?;
             }
-            // それ以外の場合、セミコロンを期待
-            self.expect_token(Token::Semicolon)?;
+
             statements.push(statement);
+            println!("Finished parsing block, current token: {:?}", self.peek());
         }
 
         self.expect_token(Token::RightBrace)?;
@@ -327,24 +350,40 @@ impl Parser {
     fn parse_block_contents(&mut self) -> Result<Vec<Statement>, ParserError> {
         let mut statements = Vec::new();
         while !self.check(Token::RightBrace) && !self.is_at_end() {
-            statements.push(self.parse_statement()?);
-            if !self.check(Token::RightBrace) {
-                self.expect_token(Token::Semicolon)?;
+            let statement = self.parse_statement()?;
+
+            // `If` ステートメントの後にはセミコロンを期待しない
+            if !matches!(&statement, Statement::If(..)) {
+                if !self.check(Token::RightBrace) && self.peek() != Some(&Token::Else) {
+                    self.expect_token(Token::Semicolon)?;
+                }
             }
+
+            statements.push(statement);
         }
         Ok(statements)
     }
+
     // 文の解析
     fn parse_statement(&mut self) -> Result<Statement, ParserError> {
         println!("Parsing statement, current token: {:?}", self.peek());
-        match self.peek() {
+        let result = match self.peek() {
             Some(Token::Let) => {
                 let stmt = self.parse_declaration()?;
                 self.expect_token(Token::Semicolon)?; // 変数宣言の後にセミコロンを期待
                 Ok(stmt)
             }
             Some(Token::Fn) => Ok(Statement::Function(self.parse_function()?)),
-            Some(Token::If) => self.parse_if_statement(),
+            Some(Token::If) => {
+                let stmt = self.parse_if_statement()?;
+                println!(
+                    // ここ呼ばれてないWTF
+                    "After parsing if statement, current token: {:?}",
+                    self.peek()
+                );
+                // If ステートメントの後にはセミコロンを期待しない
+                Ok(stmt)
+            }
             Some(Token::Print) => {
                 let stmt = self.parse_print_statement()?;
                 self.expect_token(Token::Semicolon)?; // print文の後にセミコロンを期待
@@ -352,7 +391,12 @@ impl Parser {
             }
             Some(Token::Identifier(_)) => self.parse_assignment_or_expression_statement(),
             _ => Err(ParserError::UnexpectedEOF),
-        }
+        };
+        println!(
+            "Finished parsing statement, current token: {:?}",
+            self.peek()
+        );
+        result
     }
 
     // カーソルを進める補助関数
