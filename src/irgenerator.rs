@@ -1,6 +1,6 @@
 extern crate inkwell;
 
-use crate::ast::{Expr, Operator, Statement};
+use crate::ast::{Expr, Operator, Statement, Type};
 use inkwell::builder::Builder;
 use inkwell::context::Context;
 use inkwell::module::Module;
@@ -115,9 +115,38 @@ impl<'a> IRGenerator<'a> {
                 self.context.i32_type().const_int(0, false)
             }
             Statement::Function(func) => {
-                // 関数定義のIR生成ロジック
+                // 関数シグネチャの生成
+                let return_type = match func.return_type {
+                    Type::Int => self.context.i32_type(),
+                    // 他の型の場合の処理
+                };
+                let fn_type = return_type.fn_type(&[], false);
+                let function = self.module.add_function(&func.name, fn_type, None);
+            
+                // 関数本体の生成
+                for statement in &func.body {
+                    self.generate_ir_for_statement(statement, &function);
+                }
+            
+                // 関数のエンドポイントの設定 void
+                self.builder.build_return(None);
+            
+                // ダミーの戻り値（関数自体は値を返さないため）
                 self.context.i32_type().const_int(0, false)
             }
+            Statement::Block(statements) => {
+                for stmt in statements {
+                    self.generate_ir_for_statement(stmt, function);
+                }
+                // ブロック自体は値を返さないので0を返す
+                self.context.i32_type().const_int(0, false)
+            },
+            Statement::Assignment(name, expr) => {
+                let value = self.generate_ir_inner(expr, function);
+                let variable = self.variables.get(name).expect("Variable not found");
+                self.builder.build_store(*variable, value);
+                value
+            },            
             _ => todo!("IR generation for other statement types"),
         }
     }
