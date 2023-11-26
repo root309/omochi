@@ -44,18 +44,25 @@ impl Parser {
         self.tokens.get(self.current + 1)
     }
     // 現在のトークンが指定したトークンかどうかを確認
-    fn check(&self, token: Token) -> bool {
-        self.peek().map_or(false, |t| *t == token)
+    fn check(&self, token: &Token) -> bool {
+        match (self.peek(), token) {
+            (Some(current_token), expected_token) => current_token == expected_token,
+            _ => false,
+        }
     }
     // 指定したトークンが現在のトークンであれば、それを消費して true を返す
     fn match_token(&mut self, token: Token) -> bool {
-        if self.check(token) {
+        println!("Checking token: {:?}, Current token: {:?}", token, self.peek());
+        if self.check(&token) {
             self.consume();
+            println!("Token matched and consumed: {:?}", token);
             true
         } else {
+            println!("Token not matched: {:?}, Current token: {:?}", token, self.peek());
             false
         }
     }
+    
     // 指定されたトークンを期待しているか確認し、そうでなければエラー
     fn expect_token(&mut self, expected: Token) -> Result<(), ParserError> {
         let token = self.consume().ok_or(ParserError::UnexpectedEOF)?;
@@ -313,7 +320,7 @@ impl Parser {
 
             let is_if_statement = matches!(&statement, Statement::If(..));
 
-            if !is_if_statement && !self.check(Token::RightBrace) {
+            if !is_if_statement && !self.check(&Token::RightBrace) {
                 if self.peek() != Some(&Token::Else) && self.peek() != Some(&Token::If) {
                     println!("Expecting semicolon, current token: {:?}", self.peek());
                     self.expect_token(Token::Semicolon)?;
@@ -330,7 +337,7 @@ impl Parser {
     // ブロック内の文の解析
     fn parse_block_contents(&mut self) -> Result<Vec<Statement>, ParserError> {
         let mut statements = Vec::new();
-        while !self.check(Token::RightBrace) && !self.is_at_end() {
+        while !self.check(&Token::RightBrace) && !self.is_at_end() {
             println!(
                 "Parsing statement in block, current token: {:?}",
                 self.peek()
@@ -343,7 +350,7 @@ impl Parser {
 
             // `If` ステートメントの後にはセミコロンを期待しない
             if !matches!(&statement, Statement::If(..)) {
-                if !self.check(Token::RightBrace) && self.peek() != Some(&Token::Else) {
+                if !self.check(&Token::RightBrace) && self.peek() != Some(&Token::Else) {
                     println!("Expecting semicolon, current token: {:?}", self.peek());
                     self.expect_token(Token::Semicolon)?;
                 }
@@ -368,9 +375,10 @@ impl Parser {
             self.peek()
         );
         self.expect_token(Token::RightBrace)?;
+
         println!("Current token before checking else: {:?}", self.peek());
         let else_branch = if self.match_token(Token::Else) {
-            println!("Parsing else branch, current token: {:?}", self.peek());
+            println!("Entering else branch, current token: {:?}", self.peek());
             self.expect_token(Token::LeftBrace)?;
             let else_statements = self.parse_block_contents()?;
             self.expect_token(Token::RightBrace)?;
@@ -380,6 +388,7 @@ impl Parser {
             );
             Some(Box::new(Statement::Block(else_statements)))
         } else {
+            println!("No else branch, current token: {:?}", self.peek());
             None
         };
 
