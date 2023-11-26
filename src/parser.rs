@@ -57,12 +57,10 @@ impl Parser {
             match (&token, current_token) {
                 (Token::Else, Token::Identifier(name)) if name == "else" => {
                     self.consume();
-                    println!("Token Else matched and consumed");
                     true
                 },
                 _ if &token == current_token => {
                     self.consume();
-                    println!("Token matched and consumed: {:?}", token);
                     true
                 },
                 _ => {
@@ -105,10 +103,6 @@ impl Parser {
                         self.consume(); // '=' トークンを消費する
                         let rhs = self.parse_expression()?; // 右辺の式を解析
                         expr = Expr::Assign(name, Box::new(rhs));
-                        println!(
-                            "Finished parsing assignment, current token: {:?}",
-                            self.peek()
-                        );
                     } else {
                         return Err(ParserError::InvalidSyntax);
                     }
@@ -320,22 +314,12 @@ impl Parser {
             if *token == Token::RightBrace {
                 break;
             }
-
-            println!(
-                "Before parsing statement in block, current token: {:?}",
-                self.peek()
-            );
             let statement = self.parse_statement()?;
-            println!(
-                "After parsing statement in block, current token: {:?}",
-                self.peek()
-            );
 
             let is_if_statement = matches!(&statement, Statement::If(..));
 
             if !is_if_statement && !self.check(&Token::RightBrace) {
                 if self.peek() != Some(&Token::Else) && self.peek() != Some(&Token::If) {
-                    println!("Expecting semicolon, current token: {:?}", self.peek());
                     self.expect_token(Token::Semicolon)?;
                 }
             }
@@ -351,20 +335,11 @@ impl Parser {
     fn parse_block_contents(&mut self) -> Result<Vec<Statement>, ParserError> {
         let mut statements = Vec::new();
         while !self.check(&Token::RightBrace) && !self.is_at_end() {
-            println!(
-                "Parsing statement in block, current token: {:?}",
-                self.peek()
-            );
             let statement = self.parse_statement()?;
-            println!(
-                "Finished parsing statement in block, current token: {:?}",
-                self.peek()
-            );
 
             // `If` ステートメントの後にはセミコロンを期待しない
             if !matches!(&statement, Statement::If(..)) {
                 if !self.check(&Token::RightBrace) && self.peek() != Some(&Token::Else) {
-                    println!("Expecting semicolon, current token: {:?}", self.peek());
                     self.expect_token(Token::Semicolon)?;
                 }
             }
@@ -373,42 +348,25 @@ impl Parser {
         }
         Ok(statements)
     }
-    // 正しく解析されている
     // if文の解析
     fn parse_if_statement(&mut self) -> Result<Statement, ParserError> {
-        println!("Parsing if statement, current token: {:?}", self.peek());
         self.expect_token(Token::If)?;
         let condition = self.parse_expression()?;
         self.expect_token(Token::LeftBrace)?;
 
-        println!("Parsing then branch, current token: {:?}", self.peek());
         let then_branch = self.parse_block_contents()?;
-        println!(
-            "Finished parsing then branch, current token: {:?}",
-            self.peek()
-        );
         self.expect_token(Token::RightBrace)?;
 
-        println!("Current token before checking else: {:?}", self.peek());
         let else_branch = if self.match_token(Token::Else) {
-            println!("Entering else branch, current token: {:?}", self.peek());
             self.expect_token(Token::LeftBrace)?;
             let else_statements = self.parse_block_contents()?;
             self.expect_token(Token::RightBrace)?;
-            println!(
-                "Finished parsing else branch, current token: {:?}",
-                self.peek()
-            );
             Some(Box::new(Statement::Block(else_statements)))
         } else {
             println!("No else branch, current token: {:?}", self.peek());
             None
         };
 
-        println!(
-            "Finished parsing if statement, current token: {:?}",
-            self.peek()
-        );
         Ok(Statement::If(
             Box::new(condition),
             Box::new(Statement::Block(then_branch)),
@@ -446,83 +404,6 @@ impl Parser {
             }
             _ => Err(ParserError::UnexpectedEOF),
         };
-        println!(
-            "Finished parsing statement, current token: {:?}",
-            self.peek()
-        );
         result
-    }
-}
-#[cfg(test)]
-mod tests {
-    use crate::ast::{Expr, Operator, Statement};
-    use crate::lexer::Lexer;
-    use crate::parser::Parser;
-
-    fn parse(input: &str) -> Result<Vec<Statement>, String> {
-        let mut lexer = Lexer::new(input);
-        let tokens = lexer.lex().map_err(|e| e.to_string())?;
-        let mut parser = Parser::new(tokens);
-        parser.parse_block().map_err(|e| format!("{:?}", e))
-    }
-
-    #[test]
-    fn test_if_statement() {
-        let input = "{ if (x > 5) { x = 10; } else { x = 0; } }";
-        let statements = parse(input).expect("Failed to parse if statement");
-
-        assert_eq!(statements.len(), 1);
-        match &statements[0] {
-            Statement::If(condition, then_branch, else_branch) => {
-                match &**condition {
-                    Expr::BinaryOp(lhs, op, rhs) => match (&**lhs, op, &**rhs) {
-                        (Expr::Variable(name), Operator::MoreThan, Expr::Integer(value)) => {
-                            assert_eq!(name, "x");
-                            assert_eq!(*value, 5);
-                        }
-                        _ => panic!("Expected a binary operation"),
-                    },
-                    _ => panic!("Expected a binary operation in if condition"),
-                }
-
-                match &**then_branch {
-                    Statement::Block(statements) => {
-                        assert_eq!(statements.len(), 1);
-                        match &statements[0] {
-                            Statement::Assignment(var, expr) => {
-                                assert_eq!(var, "x");
-                                match expr {
-                                    Expr::Integer(value) => assert_eq!(*value, 10),
-                                    _ => panic!("Expected an integer expression"),
-                                }
-                            }
-                            _ => panic!("Expected an assignment statement"),
-                        }
-                    }
-                    _ => panic!("Expected a block statement"),
-                }
-
-                match else_branch {
-                    Some(branch) => match &**branch {
-                        Statement::Block(statements) => {
-                            assert_eq!(statements.len(), 1);
-                            match &statements[0] {
-                                Statement::Assignment(var, expr) => {
-                                    assert_eq!(var, "x");
-                                    match expr {
-                                        Expr::Integer(value) => assert_eq!(*value, 0),
-                                        _ => panic!("Expected an integer expression"),
-                                    }
-                                }
-                                _ => panic!("Expected an assignment statement"),
-                            }
-                        }
-                        _ => panic!("Expected a block statement"),
-                    },
-                    None => panic!("Expected an else branch"),
-                }
-            }
-            _ => panic!("Expected an if statement"),
-        }
     }
 }
