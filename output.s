@@ -19,7 +19,7 @@ main:                                   # @main
 	movl	$0, 4(%rsp)
 .LBB0_3:                                # %ifcont
 	movl	4(%rsp), %esi
-	movl	$.Lfmt, %edi
+	leaq	.Lfmt(%rip), %rdi
 	xorl	%eax, %eax
 	callq	printf@PLT
 	xorl	%eax, %eax
