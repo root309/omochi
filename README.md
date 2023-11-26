@@ -5,10 +5,10 @@
 
 #### LLVM IR からアセンブリ言語へのコンパイル
 ```
-llc -filetype=asm output.ll -o output.s
+llc -relocation-model=pic -filetype=asm output.ll -o output.s
 ```
 
 #### アセンブリ言語から実行可能ファイルへのコンパイル
 ```
-gcc output.s -o program
+gcc -fPIE -pie output.s -o program
 ```
