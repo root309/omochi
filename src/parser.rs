@@ -53,15 +53,28 @@ impl Parser {
     // 指定したトークンが現在のトークンであれば、それを消費して true を返す
     fn match_token(&mut self, token: Token) -> bool {
         println!("Checking token: {:?}, Current token: {:?}", token, self.peek());
-        if self.check(&token) {
-            self.consume();
-            println!("Token matched and consumed: {:?}", token);
-            true
+        if let Some(current_token) = self.peek() {
+            match (&token, current_token) {
+                (Token::Else, Token::Identifier(name)) if name == "else" => {
+                    self.consume();
+                    println!("Token Else matched and consumed");
+                    true
+                },
+                _ if &token == current_token => {
+                    self.consume();
+                    println!("Token matched and consumed: {:?}", token);
+                    true
+                },
+                _ => {
+                    println!("Token not matched: {:?}, Current token: {:?}", token, self.peek());
+                    false
+                }
+            }
         } else {
-            println!("Token not matched: {:?}, Current token: {:?}", token, self.peek());
             false
         }
     }
+    
     
     // 指定されたトークンを期待しているか確認し、そうでなければエラー
     fn expect_token(&mut self, expected: Token) -> Result<(), ParserError> {
