@@ -203,16 +203,16 @@ impl Parser {
             self.peek()
         );
         self.expect_token(Token::RightBrace)?;
-
+        println!("Current token before checking else: {:?}", self.peek());
         let else_branch = if self.match_token(Token::Else) {
             println!("Parsing else branch, current token: {:?}", self.peek());
             self.expect_token(Token::LeftBrace)?;
             let else_statements = self.parse_block_contents()?;
+            self.expect_token(Token::RightBrace)?;
             println!(
                 "Finished parsing else branch, current token: {:?}",
                 self.peek()
             );
-            self.expect_token(Token::RightBrace)?;
             Some(Box::new(Statement::Block(else_statements)))
         } else {
             None
@@ -410,21 +410,6 @@ impl Parser {
                 );
                 // If ステートメントの後にはセミコロンを期待しない
                 Ok(stmt)
-            }
-            Some(Token::Else) => {
-                self.consume(); // "else" トークンを消費
-                if self.match_token(Token::LeftBrace) {
-                    // LeftBrace トークンを正しくマッチング
-                    let else_branch = self.parse_block_contents()?;
-                    self.expect_token(Token::RightBrace)?; // 対応する RightBrace トークンを期待
-                    Ok(Statement::Block(else_branch))
-                } else {
-                    // LeftBrace トークンがない場合のエラー処理
-                    Err(ParserError::UnexpectedToken {
-                        expected: String::from("LeftBrace"),
-                        found: format!("{:?}", self.peek()),
-                    })
-                }
             }
             Some(Token::Print) => {
                 let stmt = self.parse_print_statement()?;
