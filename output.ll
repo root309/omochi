@@ -22,6 +22,7 @@ else:                                             ; preds = %entry
 ifcont:                                           ; preds = %else, %then
   %x2 = load i32, i32* %x, align 4
   %printf_call = call i8* (i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @fmt, i32 0, i32 0), i32 %x2)
+  ret i32 0
 }
 
 declare i8* @printf(i8*, ...)

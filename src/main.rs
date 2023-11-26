@@ -45,7 +45,9 @@ fn main() {
     for statement in statements {
         ir_generator.generate_ir_for_statement(&statement, &function);
     }
-
+    // 関数の戻り値を設定
+    let return_value = context.i32_type().const_int(0, false);
+    ir_generator.build_return(return_value);
     // IRをファイルに出力
     ir_generator.module.print_to_file("output.ll").unwrap();
 }
