@@ -19,7 +19,15 @@ impl Parser {
     pub fn new(tokens: Vec<Token>) -> Self {
         Parser { tokens, current: 0 }
     }
+    // カーソルを進める補助関数
+    fn advance(&mut self) {
+        self.consume();
+    }
 
+    // 直前のトークンを取得する補助関数
+    fn previous(&self) -> &Token {
+        &self.tokens[self.current - 1]
+    }
     // トークン列から次のトークンを取得し、カーソルを進める
     fn consume(&mut self) -> Option<Token> {
         let token = self.tokens.get(self.current)?.clone();
@@ -188,47 +196,6 @@ impl Parser {
             body,
         })
     }
-    // 正しく解析されている
-    // if文の解析
-    fn parse_if_statement(&mut self) -> Result<Statement, ParserError> {
-        println!("Parsing if statement, current token: {:?}", self.peek());
-        self.expect_token(Token::If)?;
-        let condition = self.parse_expression()?;
-        self.expect_token(Token::LeftBrace)?;
-
-        println!("Parsing then branch, current token: {:?}", self.peek());
-        let then_branch = self.parse_block_contents()?;
-        println!(
-            "Finished parsing then branch, current token: {:?}",
-            self.peek()
-        );
-        self.expect_token(Token::RightBrace)?;
-        println!("Current token before checking else: {:?}", self.peek());
-        let else_branch = if self.match_token(Token::Else) {
-            println!("Parsing else branch, current token: {:?}", self.peek());
-            self.expect_token(Token::LeftBrace)?;
-            let else_statements = self.parse_block_contents()?;
-            self.expect_token(Token::RightBrace)?;
-            println!(
-                "Finished parsing else branch, current token: {:?}",
-                self.peek()
-            );
-            Some(Box::new(Statement::Block(else_statements)))
-        } else {
-            None
-        };
-
-        println!(
-            "Finished parsing if statement, current token: {:?}",
-            self.peek()
-        );
-        Ok(Statement::If(
-            Box::new(condition),
-            Box::new(Statement::Block(then_branch)),
-            else_branch,
-        ))
-    }
-
     // print文の解析
     fn parse_print_statement(&mut self) -> Result<Statement, ParserError> {
         self.expect_token(Token::Print)?;
@@ -386,7 +353,46 @@ impl Parser {
         }
         Ok(statements)
     }
+    // 正しく解析されている
+    // if文の解析
+    fn parse_if_statement(&mut self) -> Result<Statement, ParserError> {
+        println!("Parsing if statement, current token: {:?}", self.peek());
+        self.expect_token(Token::If)?;
+        let condition = self.parse_expression()?;
+        self.expect_token(Token::LeftBrace)?;
 
+        println!("Parsing then branch, current token: {:?}", self.peek());
+        let then_branch = self.parse_block_contents()?;
+        println!(
+            "Finished parsing then branch, current token: {:?}",
+            self.peek()
+        );
+        self.expect_token(Token::RightBrace)?;
+        println!("Current token before checking else: {:?}", self.peek());
+        let else_branch = if self.match_token(Token::Else) {
+            println!("Parsing else branch, current token: {:?}", self.peek());
+            self.expect_token(Token::LeftBrace)?;
+            let else_statements = self.parse_block_contents()?;
+            self.expect_token(Token::RightBrace)?;
+            println!(
+                "Finished parsing else branch, current token: {:?}",
+                self.peek()
+            );
+            Some(Box::new(Statement::Block(else_statements)))
+        } else {
+            None
+        };
+
+        println!(
+            "Finished parsing if statement, current token: {:?}",
+            self.peek()
+        );
+        Ok(Statement::If(
+            Box::new(condition),
+            Box::new(Statement::Block(then_branch)),
+            else_branch,
+        ))
+    }
     // 文の解析
     fn parse_statement(&mut self) -> Result<Statement, ParserError> {
         println!("Parsing statement, current token: {:?}", self.peek());
@@ -398,17 +404,7 @@ impl Parser {
             }
             Some(Token::Fn) => Ok(Statement::Function(self.parse_function()?)),
             Some(Token::If) => {
-                println!(
-                    "Before parsing if statement, current token: {:?}",
-                    self.peek()
-                );
                 let stmt = self.parse_if_statement()?;
-                println!(
-                    // ここ呼ばれてないWTF
-                    "After parsing if statement, current token: {:?}",
-                    self.peek()
-                );
-                // If ステートメントの後にはセミコロンを期待しない
                 Ok(stmt)
             }
             Some(Token::Print) => {
@@ -433,16 +429,6 @@ impl Parser {
             self.peek()
         );
         result
-    }
-
-    // カーソルを進める補助関数
-    fn advance(&mut self) {
-        self.consume();
-    }
-
-    // 直前のトークンを取得する補助関数
-    fn previous(&self) -> &Token {
-        &self.tokens[self.current - 1]
     }
 }
 #[cfg(test)]
