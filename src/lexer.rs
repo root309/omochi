@@ -1,4 +1,3 @@
-// use regex::Regex;
 use crate::ast::Token;
 use std::fmt;
 use std::str::Chars;
