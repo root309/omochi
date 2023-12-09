@@ -52,19 +52,27 @@ impl Parser {
     }
     // 指定したトークンが現在のトークンであれば、それを消費して true を返す
     fn match_token(&mut self, token: Token) -> bool {
-        println!("Checking token: {:?}, Current token: {:?}", token, self.peek());
+        println!(
+            "Checking token: {:?}, Current token: {:?}",
+            token,
+            self.peek()
+        );
         if let Some(current_token) = self.peek() {
             match (&token, current_token) {
                 (Token::Else, Token::Identifier(name)) if name == "else" => {
                     self.consume();
                     true
-                },
+                }
                 _ if &token == current_token => {
                     self.consume();
                     true
-                },
+                }
                 _ => {
-                    println!("Token not matched: {:?}, Current token: {:?}", token, self.peek());
+                    println!(
+                        "Token not matched: {:?}, Current token: {:?}",
+                        token,
+                        self.peek()
+                    );
                     false
                 }
             }
@@ -72,8 +80,7 @@ impl Parser {
             false
         }
     }
-    
-    
+
     // 指定されたトークンを期待しているか確認し、そうでなければエラー
     fn expect_token(&mut self, expected: Token) -> Result<(), ParserError> {
         let token = self.consume().ok_or(ParserError::UnexpectedEOF)?;
@@ -202,7 +209,9 @@ impl Parser {
         self.expect_token(Token::RightParen)?;
         self.expect_token(Token::Arrow)?;
         let return_type = self.parse_type()?;
-        let body = self.parse_block()?;
+        self.expect_token(Token::LeftBrace)?;
+        let body = self.parse_block_contents()?;
+        self.expect_token(Token::RightBrace)?;
         Ok(Function {
             name,
             params,
@@ -305,29 +314,15 @@ impl Parser {
         }
     }
 
-    // ブロック(複数の文の集合)の解析
-    pub fn parse_block(&mut self) -> Result<Vec<Statement>, ParserError> {
+    // ステートメントのシーケンスを解析
+    pub fn parse_statements(&mut self) -> Result<Vec<Statement>, ParserError> {
         let mut statements = Vec::new();
-        self.expect_token(Token::LeftBrace)?;
 
-        while let Some(token) = self.peek() {
-            if *token == Token::RightBrace {
-                break;
-            }
+        while !self.is_at_end() {
             let statement = self.parse_statement()?;
-
-            let is_if_statement = matches!(&statement, Statement::If(..));
-
-            if !is_if_statement && !self.check(&Token::RightBrace) {
-                if self.peek() != Some(&Token::Else) && self.peek() != Some(&Token::If) {
-                    self.expect_token(Token::Semicolon)?;
-                }
-            }
-
             statements.push(statement);
         }
 
-        self.expect_token(Token::RightBrace)?;
         Ok(statements)
     }
 

@@ -23,14 +23,13 @@ fn main() {
     };
 
     let mut parser = Parser::new(tokens);
-    let statements = match parser.parse_block() {
+    let statements = match parser.parse_statements() {
         Ok(statements) => statements,
         Err(e) => {
             eprintln!("Parser error: {:?}", e);
             return;
         }
     };
-
     // LLVMコンテキストの作成とIRジェネレータのインスタンス化
     let context = Context::create();
     let mut ir_generator = IRGenerator::new(&context);

@@ -8,8 +8,8 @@ main:                                   # @main
 # %bb.0:                                # %entry
 	pushq	%rax
 	.cfi_def_cfa_offset 16
-	movl	$5, 4(%rsp)
-	movb	$1, %al
+	movl	$6, 4(%rsp)
+	xorl	%eax, %eax
 	testb	%al, %al
 	jne	.LBB0_2
 # %bb.1:                                # %then

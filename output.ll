@@ -6,7 +6,7 @@ source_filename = "main"
 define i32 @main() {
 entry:
   %x = alloca i32, align 4
-  store i32 5, i32* %x, align 4
+  store i32 6, i32* %x, align 4
   %x1 = load i32, i32* %x, align 4
   %gttmp = icmp sgt i32 %x1, 5
   br i1 %gttmp, label %then, label %else
