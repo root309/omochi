@@ -45,14 +45,13 @@ impl<'a> IRGenerator<'a> {
     pub fn generate_ir_for_statement(
         &mut self,
         statement: &Statement,
-        function: &FunctionValue,
-    ) -> inkwell::values::IntValue {
+        function: &FunctionValue<'a>,
+    ) -> Result<inkwell::values::IntValue<'a>, ()> {
         match statement {
-            Statement::Expression(expr) => self.generate_ir_inner(expr, function),
+            Statement::Expression(expr) => Ok(self.generate_ir_inner(expr, function)),
             Statement::Declaration(name, expr) => {
-                // 変数宣言のIRを生成
                 self.generate_declaration_ir(name, expr, function).unwrap();
-                self.context.i32_type().const_int(0, false)
+                Ok(self.context.i32_type().const_int(0, false))
             }
             Statement::Print(expr) => {
                 // exprを評価してvalue_to_printを生成
@@ -88,7 +87,7 @@ impl<'a> IRGenerator<'a> {
                 );
 
                 // Print文は値を返さないので、0を返す
-                self.context.i32_type().const_int(0, false)
+                Ok(self.context.i32_type().const_int(0, false))
             }
             Statement::If(condition, then_branch, else_branch) => {
                 // If文のIR生成ロジック
@@ -112,7 +111,7 @@ impl<'a> IRGenerator<'a> {
 
                 self.builder.position_at_end(continue_block);
 
-                self.context.i32_type().const_int(0, false)
+                Ok(self.context.i32_type().const_int(0, false))
             }
             Statement::Function(func) => {
                 // 関数シグネチャの生成
@@ -122,40 +121,53 @@ impl<'a> IRGenerator<'a> {
                 };
                 let fn_type = return_type.fn_type(&[], false);
                 let function = self.module.add_function(&func.name, fn_type, None);
-            
+
                 // 関数本体の生成
+                let mut last_instruction = None;
                 for statement in &func.body {
-                    self.generate_ir_for_statement(statement, &function);
+                    let instruction = self.generate_ir_for_statement(statement, &function)?;
+                    last_instruction = Some(instruction);
                 }
-            
-                // 関数のエンドポイントの設定 void
-                self.builder.build_return(None);
-            
-                // ダミーの戻り値（関数自体は値を返さないため）
-                self.context.i32_type().const_int(0, false)
+
+                // 関数のエンドポイントの設定
+                if let Some(instruction) = last_instruction {
+                    self.build_return_instruction(Some(&instruction));
+                } else {
+                    // Void
+                    self.build_return_instruction(None);
+                }
+
+                // ダミーの戻り値
+                Ok(self.context.i32_type().const_int(0, false))
             }
+
             Statement::Block(statements) => {
                 for stmt in statements {
                     self.generate_ir_for_statement(stmt, function);
                 }
                 // ブロック自体は値を返さないので0を返す
-                self.context.i32_type().const_int(0, false)
-            },
+                Ok(self.context.i32_type().const_int(0, false))
+            }
             Statement::Assignment(name, expr) => {
                 let value = self.generate_ir_inner(expr, function);
                 let variable = self.variables.get(name).expect("Variable not found");
                 self.builder.build_store(*variable, value);
-                value
-            },            
+                Ok(value)
+            }
             _ => todo!("IR generation for other statement types"),
         }
     }
+    fn build_return_instruction(&mut self, value: Option<&inkwell::values::IntValue<'a>>) {
+        let basic_value = value.map(|v| v as &dyn inkwell::values::BasicValue);
+        self.builder.build_return(basic_value);
+    }
+
     // 再帰的にASTを走査してIRを生成
     fn generate_ir_inner(
-        &self,
+        &mut self,
         expr: &Expr,
-        function: &FunctionValue,
-    ) -> inkwell::values::IntValue {
+        function: &FunctionValue<'a>,
+    ) -> inkwell::values::IntValue<'a> {
         match expr {
             // 整数リテラル
             Expr::Integer(value) => self.context.i32_type().const_int(*value as u64, false),
@@ -163,35 +175,7 @@ impl<'a> IRGenerator<'a> {
             Expr::BinaryOp(left, op, right) => {
                 let left_val = self.generate_ir_inner(left, function);
                 let right_val = self.generate_ir_inner(right, function);
-                match op {
-                    Operator::Plus => self
-                        .builder
-                        .build_int_add(left_val, right_val, "addtmp")
-                        .expect("Failed to add values"),
-                    Operator::Minus => self
-                        .builder
-                        .build_int_sub(left_val, right_val, "subtmp")
-                        .expect("Failed to subtract values"),
-                    // 等値比較のIR生成
-                    Operator::Equals => self
-                        .builder
-                        .build_int_compare(IntPredicate::EQ, left_val, right_val, "eqtmp")
-                        .expect("Failed to compare values for equality"),
-                    Operator::Multiply => {
-                        // 乗算のIRコード生成
-                        self.builder
-                            .build_int_mul(left_val, right_val, "multmp")
-                            .expect("Failed to multiply values")
-                    }
-                    Operator::MoreThan => self
-                        .builder
-                        .build_int_compare(IntPredicate::SGT, left_val, right_val, "gttmp")
-                        .expect("Failed to compare values"),
-                    Operator::LessThan => self
-                        .builder
-                        .build_int_compare(IntPredicate::SLT, left_val, right_val, "lttmp")
-                        .expect("Failed to compare values"),
-                }
+                self.build_binary_op(left_val, right_val, op)
             }
             // 変数の参照
             Expr::Variable(name) => {
@@ -286,12 +270,48 @@ impl<'a> IRGenerator<'a> {
             }
         }
     }
+    fn build_binary_op(
+        &mut self,
+        left_val: inkwell::values::IntValue<'a>,
+        right_val: inkwell::values::IntValue<'a>,
+        op: &Operator,
+    ) -> inkwell::values::IntValue<'a> {
+        match op {
+            Operator::Plus => self
+                .builder
+                .build_int_add(left_val, right_val, "addtmp")
+                .expect("Failed to add values"),
+            Operator::Minus => self
+                .builder
+                .build_int_sub(left_val, right_val, "subtmp")
+                .expect("Failed to subtract values"),
+            // 等値比較のIR生成
+            Operator::Equals => self
+                .builder
+                .build_int_compare(IntPredicate::EQ, left_val, right_val, "eqtmp")
+                .expect("Failed to compare values for equality"),
+            Operator::Multiply => {
+                // 乗算のIRコード生成
+                self.builder
+                    .build_int_mul(left_val, right_val, "multmp")
+                    .expect("Failed to multiply values")
+            }
+            Operator::MoreThan => self
+                .builder
+                .build_int_compare(IntPredicate::SGT, left_val, right_val, "gttmp")
+                .expect("Failed to compare values"),
+            Operator::LessThan => self
+                .builder
+                .build_int_compare(IntPredicate::SLT, left_val, right_val, "lttmp")
+                .expect("Failed to compare values"),
+        }
+    }
     // 変数宣言のIR生成
     fn generate_declaration_ir(
         &mut self,
         name: &str,
         expr: &Expr,
-        function: &FunctionValue,
+        function: &FunctionValue<'a>,
     ) -> Result<(), String> {
         // 変数のアロケーションを作成
         let alloca = self.create_entry_block_alloca(function, name)?;
