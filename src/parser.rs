@@ -195,8 +195,11 @@ impl Parser {
             }
             None => return Err(ParserError::UnexpectedEOF),
         };
-        self.expect_token(Token::Equals)?;
-        let expr = self.parse_expression()?;
+        let expr = if self.match_token(Token::Equals) {
+            self.parse_expression()?
+        } else {
+            Expr::Integer(0)
+        };
         Ok(Statement::Declaration(name, expr))
     }
 
