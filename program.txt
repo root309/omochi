@@ -24,4 +24,8 @@ let t = 89898;
 let u = 4444;
 let v = 983;
 let w = 9898;
-print(x);
+if(x > 5){
+  print(x);
+}else{
+  print(x);
+}

@@ -34,10 +34,20 @@ main:                                   # @main
 	movl	$4444, 92(%rsp)                 # imm = 0x115C
 	movl	$983, 96(%rsp)                  # imm = 0x3D7
 	movl	$9898, 100(%rsp)                # imm = 0x26AA
+	cmpl	$6, (%rsp)
+	jl	.LBB0_2
+# %bb.1:                                # %then
 	movl	(%rsp), %esi
 	leaq	.Lfmt(%rip), %rdi
 	xorl	%eax, %eax
 	callq	printf@PLT
+	jmp	.LBB0_3
+.LBB0_2:                                # %else
+	movl	(%rsp), %esi
+	leaq	.Lfmt.2(%rip), %rdi
+	xorl	%eax, %eax
+	callq	printf.1@PLT
+.LBB0_3:                                # %ifcont
 	xorl	%eax, %eax
 	addq	$104, %rsp
 	.cfi_def_cfa_offset 8
@@ -51,5 +61,10 @@ main:                                   # @main
 .Lfmt:
 	.asciz	"%d\n"
 	.size	.Lfmt, 4
+
+	.type	.Lfmt.2,@object                 # @fmt.2
+.Lfmt.2:
+	.asciz	"%d\n"
+	.size	.Lfmt.2, 4
 
 	.section	".note.GNU-stack","",@progbits
