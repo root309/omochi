@@ -1,7 +1,27 @@
 let x = 6;
-if (x > 5) {
-    x = 10;
-} else {
-    x = 0;
-}
+let y = 6;
+let z = 3;
+let a = 4;
+let b = 5;
+let c = 1000000000000000000;
+let d = 249;
+let e = 9384;
+let f = 488;
+let g = 298374;
+let h = 38274;
+let i = 829374;
+let j = 293847;
+let k = 2390482;
+let l = 209384;
+let n = 23984;
+let m = 293874;
+let o = 098098980;
+let p = 029384;
+let q = 29834;
+let i = 090492;
+let s = 29384;
+let t = 89898;
+let u = 4444;
+let v = 983;
+let w = 9898;
 print(x);
