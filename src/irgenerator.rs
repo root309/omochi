@@ -14,6 +14,7 @@ pub struct IRGenerator<'a> {
     pub module: Module<'a>,
     builder: Builder<'a>,
     variables: HashMap<String, PointerValue<'a>>,
+    printf_func: Option<FunctionValue<'a>>,
 }
 
 impl<'a> IRGenerator<'a> {
@@ -35,11 +36,34 @@ impl<'a> IRGenerator<'a> {
             module,
             builder,
             variables: HashMap::new(), // 変数の保持用
+            printf_func: None,
         }
     }
     // 関数のリターン命令を生成
     pub fn build_return(&self, value: inkwell::values::IntValue) {
         self.builder.build_return(Some(&value));
+    }
+    fn get_printf_function(&mut self) -> FunctionValue<'a> {
+        if let Some(func) = self.printf_func {
+            return func;
+        }
+
+        let printf_type = self
+            .context
+            .i8_type()
+            .ptr_type(inkwell::AddressSpace::default())
+            .fn_type(
+                &[self
+                    .context
+                    .i8_type()
+                    .ptr_type(inkwell::AddressSpace::default())
+                    .into()],
+                true,
+            );
+
+        let printf_func = self.module.add_function("printf", printf_type, None);
+        self.printf_func = Some(printf_func);
+        printf_func
     }
     // StatementタイプのIRを生成するメソッド
     pub fn generate_ir_for_statement(
@@ -54,38 +78,25 @@ impl<'a> IRGenerator<'a> {
                 Ok(self.context.i32_type().const_int(0, false))
             }
             Statement::Print(expr) => {
+                // printf関数の取得
+                let printf_func = self.get_printf_function();
+            
                 // exprを評価してvalue_to_printを生成
                 let value_to_print = self.generate_ir_inner(expr, function);
-
-                // printf関数の宣言
-                let printf_type = self
-                    .context
-                    .i8_type()
-                    .ptr_type(inkwell::AddressSpace::default())
-                    .fn_type(
-                        &[self
-                            .context
-                            .i8_type()
-                            .ptr_type(inkwell::AddressSpace::default())
-                            .into()],
-                        true,
-                    );
-
-                let printf_func = self.module.add_function("printf", printf_type, None);
-
+            
                 // フォーマット文字列の定義
                 let format_str = self
                     .builder
                     .build_global_string_ptr("%d\n", "fmt")
                     .expect("Failed to create format string");
-
+            
                 // printf関数の呼び出し
                 self.builder.build_call(
                     printf_func,
                     &[format_str.as_pointer_value().into(), value_to_print.into()],
                     "printf_call",
                 );
-
+            
                 // Print文は値を返さないので、0を返す
                 Ok(self.context.i32_type().const_int(0, false))
             }
