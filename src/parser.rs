@@ -337,7 +337,7 @@ impl Parser {
 
             // `If` ステートメントの後にはセミコロンを期待しない
             if !matches!(&statement, Statement::If(..)) {
-                if !self.check(&Token::RightBrace) && self.peek() != Some(&Token::Else) {
+                if !self.check(&Token::RightBrace) && self.peek() != Some(&Token::Else) && self.peek() != Some(&Token::Print) {
                     self.expect_token(Token::Semicolon)?;
                 }
             }
