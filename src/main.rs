@@ -42,7 +42,7 @@ fn main() {
 
     // 解析されたプログラム (AST) から LLVM IR を生成
     for statement in statements {
-        ir_generator.generate_ir_for_statement(&statement, &function);
+        ir_generator.generate_ir_for_statement(&statement, &function).expect("Failed to generate IR");
     }
     // 関数の戻り値を設定
     let return_value = context.i32_type().const_int(0, false);

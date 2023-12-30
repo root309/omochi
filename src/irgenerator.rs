@@ -41,7 +41,7 @@ impl<'a> IRGenerator<'a> {
     }
     // 関数のリターン命令を生成
     pub fn build_return(&self, value: inkwell::values::IntValue) {
-        self.builder.build_return(Some(&value));
+        self.builder.build_return(Some(&value)).expect("Failed to build return");
     }
     fn get_printf_function(&mut self) -> FunctionValue<'a> {
         if let Some(func) = self.printf_func {
@@ -95,7 +95,7 @@ impl<'a> IRGenerator<'a> {
                     printf_func,
                     &[format_str.as_pointer_value().into(), value_to_print.into()],
                     "printf_call",
-                );
+                ).expect("Failed to build call");
             
                 // Print文は値を返さないので、0を返す
                 Ok(self.context.i32_type().const_int(0, false))
@@ -108,17 +108,22 @@ impl<'a> IRGenerator<'a> {
                 let continue_block = self.context.append_basic_block(*function, "ifcont");
 
                 self.builder
-                    .build_conditional_branch(condition_value, then_block, else_block);
+                    .build_conditional_branch(condition_value, then_block, else_block)
+                    .expect("Failed to build conditional branch");
 
                 self.builder.position_at_end(then_block);
-                self.generate_ir_for_statement(then_branch, function);
-                self.builder.build_unconditional_branch(continue_block);
+                self.generate_ir_for_statement(then_branch, function)
+                    .expect("Failed to generate ir for statement");
+                self.builder.build_unconditional_branch(continue_block)
+                    .expect("Failed to build unconditional branch");
 
                 self.builder.position_at_end(else_block);
                 if let Some(else_stmt) = else_branch {
-                    self.generate_ir_for_statement(else_stmt, function);
+                    self.generate_ir_for_statement(else_stmt, function)
+                        .expect("Failed to generate ir for statement");
                 }
-                self.builder.build_unconditional_branch(continue_block);
+                self.builder.build_unconditional_branch(continue_block)
+                    .expect("Failed to build unconditional branch");
 
                 self.builder.position_at_end(continue_block);
 
@@ -154,7 +159,8 @@ impl<'a> IRGenerator<'a> {
 
             Statement::Block(statements) => {
                 for stmt in statements {
-                    self.generate_ir_for_statement(stmt, function);
+                    self.generate_ir_for_statement(stmt, function)
+                        .expect("Failed to generate ir for statement");
                 }
                 // ブロック自体は値を返さないので0を返す
                 Ok(self.context.i32_type().const_int(0, false))
@@ -162,7 +168,7 @@ impl<'a> IRGenerator<'a> {
             Statement::Assignment(name, expr) => {
                 let value = self.generate_ir_inner(expr, function);
                 let variable = self.variables.get(name).expect("Variable not found");
-                self.builder.build_store(*variable, value);
+                self.builder.build_store(*variable, value).expect("Failed to build store");
                 Ok(value)
             }
             _ => todo!("IR generation for other statement types"),
@@ -170,7 +176,7 @@ impl<'a> IRGenerator<'a> {
     }
     fn build_return_instruction(&mut self, value: Option<&inkwell::values::IntValue<'a>>) {
         let basic_value = value.map(|v| v as &dyn inkwell::values::BasicValue);
-        self.builder.build_return(basic_value);
+        self.builder.build_return(basic_value).expect("Failed to build return");
     }
 
     // 再帰的にASTを走査してIRを生成
@@ -209,7 +215,7 @@ impl<'a> IRGenerator<'a> {
                 // 変数のアドレスを取得
                 let variable_address = self.variables.get(name).expect("Variable not found");
                 // 値を変数にストア
-                self.builder.build_store(*variable_address, value_to_assign);
+                self.builder.build_store(*variable_address, value_to_assign).expect("Failed to build store");
                 value_to_assign
             }
             // if文のIR生成
@@ -221,7 +227,8 @@ impl<'a> IRGenerator<'a> {
                 let continue_block = self.context.append_basic_block(*function, "ifcont");
                 // 条件に基づいて分岐
                 self.builder
-                    .build_conditional_branch(condition_value, then_block, else_block);
+                    .build_conditional_branch(condition_value, then_block, else_block)
+                    .expect("Failed to build conditional branch");
 
                 // thenブロックの生成
                 self.builder.position_at_end(then_block);
@@ -236,7 +243,8 @@ impl<'a> IRGenerator<'a> {
                         }
                     }
                 }
-                self.builder.build_unconditional_branch(continue_block);
+                self.builder.build_unconditional_branch(continue_block)
+                    .expect("Failed to build unconditional branch");
 
                 // elseブロックの生成
                 self.builder.position_at_end(else_block);
@@ -253,7 +261,8 @@ impl<'a> IRGenerator<'a> {
                         }
                     }
                 }
-                self.builder.build_unconditional_branch(continue_block);
+                self.builder.build_unconditional_branch(continue_block)
+                    .expect("Failed to build unconditional branch");
 
                 // continueブロックに移動
                 self.builder.position_at_end(continue_block);
@@ -334,7 +343,7 @@ impl<'a> IRGenerator<'a> {
         let ir_value = self.generate_ir_inner(expr, function);
 
         // IR値を変数にストア
-        self.builder.build_store(alloca, ir_value);
+        self.builder.build_store(alloca, ir_value).expect("Failed to build store");
 
         Ok(())
     }
