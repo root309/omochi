@@ -2,7 +2,9 @@
 source_filename = "main"
 
 @fmt = private unnamed_addr constant [4 x i8] c"%d\0A\00", align 1
+@fmt.1 = private unnamed_addr constant [4 x i8] c"%d\0A\00", align 1
 @fmt.2 = private unnamed_addr constant [4 x i8] c"%d\0A\00", align 1
+@fmt.3 = private unnamed_addr constant [4 x i8] c"%d\0A\00", align 1
 
 define i32 @main() {
 entry:
@@ -69,13 +71,15 @@ then:                                             ; preds = %entry
 
 else:                                             ; preds = %entry
   %x4 = load i32, i32* %x, align 4
-  %printf_call5 = call i8* (i8*, ...) @printf.1(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @fmt.2, i32 0, i32 0), i32 %x4)
+  %printf_call5 = call i8* (i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @fmt.1, i32 0, i32 0), i32 %x4)
   br label %ifcont
 
 ifcont:                                           ; preds = %else, %then
+  %i6 = load i32, i32* %i1, align 4
+  %printf_call7 = call i8* (i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @fmt.2, i32 0, i32 0), i32 %i6)
+  %u8 = load i32, i32* %u, align 4
+  %printf_call9 = call i8* (i8*, ...) @printf(i8* getelementptr inbounds ([4 x i8], [4 x i8]* @fmt.3, i32 0, i32 0), i32 %u8)
   ret i32 0
 }
 
 declare i8* @printf(i8*, ...)
-
-declare i8* @printf.1(i8*, ...)

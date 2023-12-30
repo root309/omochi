@@ -29,3 +29,5 @@ if(x > 5){
 }else{
   print(x);
 }
+print(i);
+print(u);
