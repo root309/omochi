@@ -57,6 +57,7 @@ pub struct Function {
     pub params: Vec<(String, Type)>,
     pub return_type: Type,
     pub body: Vec<Statement>,
+    pub return_expr: Expr,
 }
 
 // 型を表す列挙型

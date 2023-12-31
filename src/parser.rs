@@ -204,6 +204,7 @@ impl Parser {
     }
 
     // 関数定義の解析
+    // 関数定義の解析
     fn parse_function(&mut self) -> Result<Function, ParserError> {
         self.expect_token(Token::Fn)?;
         let name = self.parse_identifier()?;
@@ -213,13 +214,14 @@ impl Parser {
         self.expect_token(Token::Arrow)?;
         let return_type = self.parse_type()?;
         self.expect_token(Token::LeftBrace)?;
-        let body = self.parse_block_contents()?;
+        let (body, return_expr) = self.parse_block_contents()?;
         self.expect_token(Token::RightBrace)?;
         Ok(Function {
             name,
             params,
             return_type,
             body,
+            return_expr,
         })
     }
     // print文の解析
@@ -329,42 +331,38 @@ impl Parser {
         Ok(statements)
     }
 
-    // ブロック内の文の解析
-    fn parse_block_contents(&mut self) -> Result<Vec<Statement>, ParserError> {
+    // ブロック内のステートメントと最後の式を解析
+    fn parse_block_contents(&mut self) -> Result<(Vec<Statement>, Expr), ParserError> {
         let mut statements = Vec::new();
-        while !self.check(&Token::RightBrace) && !self.is_at_end() {
-            let statement = self.parse_statement()?;
-
-            // `If` ステートメントの後にはセミコロンを期待しない
-            if !matches!(&statement, Statement::If(..)) {
-                if !self.check(&Token::RightBrace) && self.peek() != Some(&Token::Else) && self.peek() != Some(&Token::Print) {
-                    self.expect_token(Token::Semicolon)?;
-                }
-            }
-
-            statements.push(statement);
+        while !self.check(&Token::RightBrace) {
+            statements.push(self.parse_statement()?);
         }
-        Ok(statements)
+        let last_expr = if let Statement::Expression(expr) = statements.pop().unwrap() {
+            expr
+        } else {
+            return Err(ParserError::InvalidSyntax);
+        };
+        Ok((statements, last_expr))
     }
     // if文の解析
     fn parse_if_statement(&mut self) -> Result<Statement, ParserError> {
         self.expect_token(Token::If)?;
         let condition = self.parse_expression()?;
         self.expect_token(Token::LeftBrace)?;
-
-        let then_branch = self.parse_block_contents()?;
+    
+        let (then_branch, _) = self.parse_block_contents()?;  // 最後の式は無視
         self.expect_token(Token::RightBrace)?;
-
+    
         let else_branch = if self.match_token(Token::Else) {
             self.expect_token(Token::LeftBrace)?;
-            let else_statements = self.parse_block_contents()?;
+            let (else_statements, _) = self.parse_block_contents()?;  // 最後の式は無視
             self.expect_token(Token::RightBrace)?;
             Some(Box::new(Statement::Block(else_statements)))
         } else {
             println!("No else branch, current token: {:?}", self.peek());
             None
         };
-
+    
         Ok(Statement::If(
             Box::new(condition),
             Box::new(Statement::Block(then_branch)),

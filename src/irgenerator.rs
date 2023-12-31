@@ -137,14 +137,18 @@ impl<'a> IRGenerator<'a> {
                 };
                 let fn_type = return_type.fn_type(&[], false);
                 let function = self.module.add_function(&func.name, fn_type, None);
-
+            
+                // 関数のエントリーブロックの生成
+                let entry_block = self.context.append_basic_block(function, "entry");
+                self.builder.position_at_end(entry_block);
+            
                 // 関数本体の生成
                 let mut last_instruction = None;
                 for statement in &func.body {
                     let instruction = self.generate_ir_for_statement(statement, &function)?;
                     last_instruction = Some(instruction);
                 }
-
+            
                 // 関数のエンドポイントの設定
                 if let Some(instruction) = last_instruction {
                     self.build_return_instruction(Some(&instruction));
@@ -152,7 +156,7 @@ impl<'a> IRGenerator<'a> {
                     // Void
                     self.build_return_instruction(None);
                 }
-
+            
                 // ダミーの戻り値
                 Ok(self.context.i32_type().const_int(0, false))
             }
